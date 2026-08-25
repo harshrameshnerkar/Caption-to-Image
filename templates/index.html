@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🖼️ AI Image Caption Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            padding: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+        
+        .upload-section {
+            text-align: center;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 20px;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+        
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+        }
+        
+        .upload-icon {
+            font-size: 4em;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .upload-button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .upload-button:hover {
+            transform: translateY(-2px);
+        }
+        
+        .style-selector {
+            margin: 20px 0;
+        }
+        
+        .style-selector label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .style-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .style-btn {
+            padding: 10px 20px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .style-btn.active,
+        .style-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .generate-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 25px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+        
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .results-section {
+            background: #f8f9ff;
+            border-radius: 15px;
+            padding: 30px;
+        }
+        
+        .image-preview {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .caption-result {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+            margin-top: 20px;
+        }
+        
+        .caption-text {
+            font-size: 1.3em;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .caption-style {
+            color: #667eea;
+            font-weight: bold;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #ffe6e6;
+            color: #cc0000;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #cc0000;
+            margin: 20px 0;
+        }
+        
+        .success {
+            background: #e6ffe6;
+            color: #006600;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid #006600;
+            margin: 20px 0;
+        }
+        
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+        }
+        
+        .status-ready {
+            background: #28a745;
+        }
+        
+        .status-loading {
+            background: #ffc107;
+            color: #000;
+        }
+        
+        .status-error {
+            background: #dc3545;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .style-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖼️ AI Image Caption Generator</h1>
+            <p>Upload an image and get AI-generated captions in different styles!</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="upload-section">
+                <h2>📤 Upload Image</h2>
+                
+                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-icon">📷</div>
+                    <p>Click here or drag & drop an image</p>
+                    <p style="color: #666; margin-top: 10px;">Supports: PNG, JPG, JPEG, GIF</p>
+                </div>
+                
+                <input type="file" id="fileInput" class="file-input" accept="image/*">
+                
+                <div class="style-selector">
+                    <label>🎨 Caption Style:</label>
+                    <div class="style-buttons">
+                        <button class="style-btn active" data-style="short">Short</button>
+                        <button class="style-btn" data-style="balanced">Balanced</button>
+                        <button class="style-btn" data-style="detailed">Detailed</button>
+                    </div>
+                </div>
+                
+                <button class="generate-btn" id="generateBtn" disabled>
+                    🚀 Generate Caption
+                </button>
+            </div>
+            
+            <div class="results-section">
+                <h2>🤖 AI Results</h2>
+                <div id="resultsContent">
+                    <p style="text-align: center; color: #666; margin-top: 50px;">
+                        Upload an image to see AI-generated captions here! 📝
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="statusIndicator" class="status-indicator status-loading">
+        🔄 Loading AI Model...
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let selectedStyle = 'short';
+        
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const uploadArea = document.getElementById('uploadArea');
+        const generateBtn = document.getElementById('generateBtn');
+        const resultsContent = document.getElementById('resultsContent');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const styleButtons = document.querySelectorAll('.style-btn');
+        
+        // Check model status on load
+        checkModelStatus();
+        
+        // File input change handler
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+        uploadArea.addEventListener('drop', handleDrop);
+        
+        // Style button handlers
+        styleButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                styleButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedStyle = btn.dataset.style;
+            });
+        });
+        
+        // Generate button handler
+        generateBtn.addEventListener('click', generateCaption);
+        
+        function checkModelStatus() {
+            fetch('/api/model_status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.loaded) {
+                        statusIndicator.textContent = '✅ AI Model Ready';
+                        statusIndicator.className = 'status-indicator status-ready';
+                    } else {
+                        statusIndicator.textContent = '❌ AI Model Error';
+                        statusIndicator.className = 'status-indicator status-error';
+                    }
+                })
+                .catch(error => {
+                    statusIndicator.textContent = '❌ Connection Error';
+                    statusIndicator.className = 'status-indicator status-error';
+                });
+        }
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                displayImagePreview(file);
+                generateBtn.disabled = false;
+            }
+        }
+        
+        function handleDragOver(event) {
+            event.preventDefault();
+            uploadArea.classList.add('dragover');
+        }
+        
+        function handleDragLeave() {
+            uploadArea.classList.remove('dragover');
+        }
+        
+        function handleDrop(event) {
+            event.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.type.startsWith('image/')) {
+                    selectedFile = file;
+                    fileInput.files = files;
+                    displayImagePreview(file);
+                    generateBtn.disabled = false;
+                }
+            }
+        }
+        
+        function displayImagePreview(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                resultsContent.innerHTML = `
+                    <img src="${e.target.result}" alt="Uploaded image" class="image-preview">
+                    <p style="text-align: center; color: #666;">Ready to generate caption! 🎯</p>
+                `;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function generateCaption() {
+            if (!selectedFile) {
+                alert('Please select an image first!');
+                return;
+            }
+            
+            // Show loading state
+            generateBtn.disabled = true;
+            generateBtn.textContent = '🔄 Generating...';
+            
+            resultsContent.innerHTML = `
+                <img src="${URL.createObjectURL(selectedFile)}" alt="Uploaded image" class="image-preview">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>AI is analyzing your image and generating a ${selectedStyle} caption...</p>
+                </div>
+            `;
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            formData.append('style', selectedStyle);
+            
+            // Send to API
+            fetch('/api/generate_caption', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultsContent.innerHTML = `
+                        <img src="${URL.createObjectURL(selectedFile)}" alt="Uploaded image" class="image-preview">
+                        <div class="caption-result">
+                            <div class="caption-text">"${data.caption}"</div>
+                            <div class="caption-style">Style: ${data.style}</div>
+                        </div>
+                        <div class="success">✅ Caption generated successfully!</div>
+                    `;
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+            })
+            .catch(error => {
+                resultsContent.innerHTML = `
+                    <img src="${URL.createObjectURL(selectedFile)}" alt="Uploaded image" class="image-preview">
+                    <div class="error">
+                        ❌ Error generating caption: ${error.message}
+                    </div>
+                `;
+            })
+            .finally(() => {
+                generateBtn.disabled = false;
+                generateBtn.textContent = '🚀 Generate Caption';
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CaptionAI — Intelligent Image Captioning</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:      #07090f;
+      --surface: #0d1117;
+      --glass:   rgba(255,255,255,0.04);
+      --border:  rgba(255,255,255,0.07);
+      --purple:  #8b5cf6;
+      --pink:    #ec4899;
+      --blue:    #3b82f6;
+      --text:    #f1f5f9;
+      --muted:   #64748b;
+      --green:   #10b981;
+      --red:     #ef4444;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Ambient blobs */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 70% 50% at 20% 10%, rgba(139,92,246,0.08), transparent),
+        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(236,72,153,0.06), transparent);
+    }
+
+    /* ── Navbar ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 40px; height: 64px;
+      background: rgba(7,9,15,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-size: 1.15rem; font-weight: 800; letter-spacing: -.3px;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .nav-links { display: flex; gap: 28px; }
+    .nav-links a {
+      font-size: .85rem; color: var(--muted); text-decoration: none;
+      font-weight: 500; transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-status {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 14px; border-radius: 20px; font-size: .75rem; font-weight: 600;
+      border: 1px solid rgba(255,255,255,.1); color: var(--muted);
+      transition: all .3s;
+    }
+    .nav-status.ready  { color: var(--green); border-color: rgba(16,185,129,.3); background: rgba(16,185,129,.07); }
+    .nav-status.error  { color: var(--red);   border-color: rgba(239,68,68,.3);  background: rgba(239,68,68,.07); }
+    .nav-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+    /* ── Hero ── */
+    .hero {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 80px 24px 60px;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 16px; border-radius: 20px;
+      background: rgba(139,92,246,.1); border: 1px solid rgba(139,92,246,.25);
+      color: var(--purple); font-size: .75rem; font-weight: 600;
+      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 24px;
+    }
+    .hero-title {
+      font-size: clamp(2.4rem, 5vw, 4rem);
+      font-weight: 800; line-height: 1.1; margin-bottom: 20px;
+      letter-spacing: -.5px;
+    }
+    .hero-title .grad {
+      background: linear-gradient(135deg, var(--purple) 0%, var(--pink) 60%, #f97316 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-sub {
+      font-size: 1.05rem; color: var(--muted); max-width: 520px;
+      line-height: 1.75; margin-bottom: 40px;
+    }
+    .hero-cta {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 36px; border-radius: 50px; font-size: .95rem; font-weight: 700;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      color: white; text-decoration: none; border: none; cursor: pointer;
+      box-shadow: 0 0 40px rgba(139,92,246,.35);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(139,92,246,.5); }
+    .hero-cta svg { width: 18px; height: 18px; }
+
+    /* ── Feature chips ── */
+    .feature-chips {
+      display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+      margin-top: 52px;
+    }
+    .chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 18px; border-radius: 14px;
+      background: var(--glass); border: 1px solid var(--border);
+      font-size: .82rem; font-weight: 500; color: var(--muted);
+      backdrop-filter: blur(8px);
+    }
+    .chip-icon { font-size: 1.1rem; }
+
+    /* ── Generator section ── */
+    #generator {
+      position: relative; z-index: 1;
+      max-width: 980px; margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+    .section-label {
+      text-align: center; margin-bottom: 32px;
+    }
+    .section-label h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; }
+    .section-label p  { font-size: .9rem; color: var(--muted); }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed rgba(139,92,246,.3);
+      border-radius: 20px; padding: 48px 24px;
+      text-align: center; cursor: pointer;
+      background: rgba(139,92,246,.04);
+      transition: border-color .25s, background .25s;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--purple); background: rgba(139,92,246,.08);
+    }
+    .upload-zone input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-icon-wrap {
+      width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 16px;
+      background: rgba(139,92,246,.12); display: flex; align-items: center; justify-content: center;
+    }
+    .upload-icon-wrap svg { width: 28px; height: 28px; color: var(--purple); }
+    .upload-zone h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; }
+    .upload-zone p  { font-size: .82rem; color: var(--muted); }
+    .upload-btn-fake {
+      display: inline-block; margin-top: 16px; padding: 9px 24px; border-radius: 30px;
+      background: rgba(139,92,246,.15); border: 1px solid rgba(139,92,246,.3);
+      color: var(--purple); font-size: .82rem; font-weight: 600;
+      pointer-events: none;
+    }
+
+    /* Preview */
+    .preview-wrap { display: none; }
+    .preview-inner {
+      position: relative; border-radius: 16px; overflow: hidden;
+      background: var(--surface); border: 1px solid var(--border);
+    }
+    .preview-inner img {
+      width: 100%; max-height: 380px; object-fit: contain; display: block;
+    }
+    .preview-change {
+      position: absolute; top: 12px; right: 12px;
+      padding: 7px 16px; border-radius: 20px; font-size: .75rem; font-weight: 600;
+      background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.15);
+      color: var(--text); cursor: pointer; backdrop-filter: blur(6px);
+      transition: background .2s;
+    }
+    .preview-change:hover { background: rgba(139,92,246,.4); }
+
+    /* Style selector */
+    .style-section { margin-top: 28px; }
+    .style-label {
+      font-size: .72rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 1.5px; font-weight: 600; margin-bottom: 12px;
+    }
+    .style-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    .style-card {
+      padding: 16px; border-radius: 14px; cursor: pointer;
+      background: var(--glass); border: 1px solid var(--border);
+      transition: all .2s; text-align: center;
+    }
+    .style-card:hover { border-color: rgba(139,92,246,.4); background: rgba(139,92,246,.06); }
+    .style-card.active {
+      border-color: var(--purple); background: rgba(139,92,246,.1);
+      box-shadow: 0 0 20px rgba(139,92,246,.15);
+    }
+    .style-card-icon { font-size: 1.6rem; margin-bottom: 8px; }
+    .style-card-name { font-size: .88rem; font-weight: 600; margin-bottom: 4px; }
+    .style-card-desc { font-size: .72rem; color: var(--muted); line-height: 1.4; }
+
+    /* Generate button */
+    .gen-wrap { margin-top: 24px; text-align: center; }
+    #generateBtn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 15px 44px; border-radius: 50px; font-size: 1rem; font-weight: 700;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      color: white; border: none; cursor: pointer;
+      box-shadow: 0 0 32px rgba(139,92,246,.35);
+      transition: transform .2s, box-shadow .2s, opacity .2s;
+    }
+    #generateBtn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 50px rgba(139,92,246,.5); }
+    #generateBtn:disabled { opacity: .6; cursor: not-allowed; }
+    #generateBtn svg { width: 18px; height: 18px; }
+
+    /* Spinner */
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Loading bar */
+    .loading-bar {
+      display: none; margin: 20px auto 0; max-width: 360px;
+      height: 3px; border-radius: 3px; background: rgba(255,255,255,.07);
+      overflow: hidden;
+    }
+    .loading-bar.show { display: block; }
+    .loading-bar::after {
+      content: ''; display: block; height: 100%;
+      background: linear-gradient(90deg, var(--purple), var(--pink));
+      border-radius: 3px;
+      animation: loading-slide 1.5s ease-in-out infinite;
+    }
+    @keyframes loading-slide {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(300%); }
+    }
+    .loading-hint { text-align: center; font-size: .8rem; color: var(--muted); margin-top: 10px; }
+
+    /* Output card */
+    .output-card {
+      display: none; margin-top: 28px;
+      background: var(--glass); border: 1px solid rgba(139,92,246,.2);
+      border-radius: 20px; overflow: hidden;
+      box-shadow: 0 0 40px rgba(139,92,246,.08);
+      animation: fade-up .35s ease;
+    }
+    .output-card.show { display: block; }
+    @keyframes fade-up { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+
+    .output-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,.02);
+    }
+    .output-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .78rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 1.2px; color: var(--purple);
+    }
+    .output-actions { display: flex; gap: 8px; }
+    .action-btn {
+      padding: 6px 14px; border-radius: 20px; font-size: .75rem; font-weight: 600;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 6px;
+    }
+    .action-btn:hover { color: var(--text); border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.05); }
+    .action-btn svg { width: 13px; height: 13px; }
+
+    .output-body { padding: 24px; }
+
+    .caption-short {
+      font-size: 1.8rem; font-weight: 700; text-align: center;
+      background: linear-gradient(135deg, var(--purple), var(--pink));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; padding: 16px 0;
+    }
+    .caption-balanced {
+      font-size: .95rem; line-height: 1.85; color: var(--text);
+      white-space: pre-line;
+    }
+    .caption-detailed {
+      font-size: .9rem; line-height: 1.85; color: var(--text);
+      max-height: 420px; overflow-y: auto; padding-right: 8px;
+    }
+    .caption-detailed::-webkit-scrollbar { width: 4px; }
+    .caption-detailed::-webkit-scrollbar-thumb { background: rgba(139,92,246,.3); border-radius: 4px; }
+
+    .output-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px; border-top: 1px solid var(--border);
+      background: rgba(255,255,255,.015);
+    }
+    .output-meta { font-size: .72rem; color: var(--muted); display: flex; gap: 14px; }
+    .meta-pill {
+      display: flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 12px;
+      background: rgba(139,92,246,.08); border: 1px solid rgba(139,92,246,.15);
+      color: var(--purple);
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 28px; right: 28px; z-index: 300;
+      padding: 12px 20px; border-radius: 12px; font-size: .85rem; font-weight: 500;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); transform: translateY(80px); opacity: 0;
+      transition: all .3s; pointer-events: none;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: rgba(16,185,129,.4); color: var(--green); }
+    #toast.error   { border-color: rgba(239,68,68,.4);  color: var(--red); }
+
+    /* ── About / tech section ── */
+    #about {
+      position: relative; z-index: 1;
+      max-width: 980px; margin: 0 auto; padding: 0 24px 80px;
+    }
+    .about-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 32px; }
+    .about-card {
+      background: var(--glass); border: 1px solid var(--border);
+      border-radius: 16px; padding: 22px;
+      backdrop-filter: blur(8px);
+      transition: border-color .2s, transform .2s;
+    }
+    .about-card:hover { border-color: rgba(139,92,246,.3); transform: translateY(-3px); }
+    .about-icon { font-size: 1.6rem; margin-bottom: 12px; }
+    .about-title { font-size: .92rem; font-weight: 700; margin-bottom: 6px; }
+    .about-desc { font-size: .8rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── Footer ── */
+    footer {
+      position: relative; z-index: 1;
+      text-align: center; padding: 28px;
+      border-top: 1px solid var(--border);
+      font-size: .8rem; color: var(--muted);
+    }
+    footer span { color: var(--purple); }
+
+    @media (max-width: 700px) {
+      .style-grid { grid-template-columns: 1fr; }
+      .about-grid { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      nav { padding: 0 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav>
+  <div class="nav-logo">CaptionAI</div>
+  <div class="nav-links">
+    <a href="#generator">Try Now</a>
+    <a href="#about">How It Works</a>
+  </div>
+  <div class="nav-status" id="modelStatus">
+    <div class="nav-dot"></div>
+    <span id="statusText">Checking model…</span>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+    ViT + GPT-2 · Transformer Architecture
+  </div>
+  <h1 class="hero-title">
+    Turn Any Image Into<br><span class="grad">Intelligent Captions</span>
+  </h1>
+  <p class="hero-sub">
+    Upload a photo and get AI-generated descriptions in three styles —
+    from quick labels to rich storytelling narratives.
+  </p>
+  <a href="#generator" class="hero-cta">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
+    Try the Generator
+  </a>
+  <div class="feature-chips">
+    <div class="chip"><span class="chip-icon">⚡</span> Short captions</div>
+    <div class="chip"><span class="chip-icon">📖</span> Detailed descriptions</div>
+    <div class="chip"><span class="chip-icon">📚</span> Story narratives</div>
+    <div class="chip"><span class="chip-icon">🔊</span> Text to speech</div>
+    <div class="chip"><span class="chip-icon">📋</span> One-click copy</div>
+  </div>
+</section>
+
+<!-- Generator -->
+<section id="generator">
+  <div class="section-label">
+    <h2>Caption Generator</h2>
+    <p>Drop an image and choose your style</p>
+  </div>
+
+  <!-- Upload zone -->
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="imageInput" accept="image/*" />
+    <div class="upload-icon-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+    </div>
+    <h3>Drop your image here</h3>
+    <p>PNG, JPG, JPEG, GIF · Up to 16 MB</p>
+    <div class="upload-btn-fake">Browse Files</div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-wrap" id="previewWrap">
+    <div class="preview-inner">
+      <img id="previewImg" src="" alt="Preview" />
+      <button class="preview-change" id="changeBtn">↺ Change image</button>
+    </div>
+  </div>
+
+  <!-- Style selector -->
+  <div class="style-section" id="styleSection" style="display:none">
+    <div class="style-label">Choose caption style</div>
+    <div class="style-grid">
+      <div class="style-card active" data-style="short">
+        <div class="style-card-icon">⚡</div>
+        <div class="style-card-name">Short</div>
+        <div class="style-card-desc">8–10 word quick label identifying key subjects</div>
+      </div>
+      <div class="style-card" data-style="balanced">
+        <div class="style-card-icon">📖</div>
+        <div class="style-card-name">Balanced</div>
+        <div class="style-card-desc">Multi-sentence paragraph covering all visual aspects</div>
+      </div>
+      <div class="style-card" data-style="detailed">
+        <div class="style-card-icon">📚</div>
+        <div class="style-card-name">Detailed Story</div>
+        <div class="style-card-desc">Rich narrative with characters, setting, and emotion</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Generate -->
+  <div class="gen-wrap" id="genWrap" style="display:none">
+    <button id="generateBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      Generate Caption
+    </button>
+    <div class="loading-bar" id="loadingBar"></div>
+    <div class="loading-hint" id="loadingHint" style="display:none">AI is analyzing your image… this may take 5–20 seconds</div>
+  </div>
+
+  <!-- Output -->
+  <div class="output-card" id="outputCard">
+    <div class="output-head">
+      <div class="output-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Generated Caption
+      </div>
+      <div class="output-actions">
+        <button class="action-btn" id="copyBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy
+        </button>
+        <button class="action-btn" id="speakBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          Speak
+        </button>
+      </div>
+    </div>
+    <div class="output-body">
+      <div id="captionOutput"></div>
+    </div>
+    <div class="output-footer">
+      <div class="output-meta">
+        <span class="meta-pill" id="stylePill">—</span>
+        <span class="meta-pill" id="wordsPill">0 words</span>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted)">ViT + GPT-2 · nlpconnect</div>
+    </div>
+  </div>
+</section>
+
+<!-- About / How it works -->
+<section id="about">
+  <div class="section-label">
+    <h2>How It Works</h2>
+    <p>Powered by state-of-the-art vision-language models</p>
+  </div>
+  <div class="about-grid">
+    <div class="about-card">
+      <div class="about-icon">🧠</div>
+      <div class="about-title">Vision Transformer (ViT)</div>
+      <div class="about-desc">Google's ViT-Base splits your image into 16×16 patches and encodes them as rich visual tokens that capture spatial relationships and fine details.</div>
+    </div>
+    <div class="about-card">
+      <div class="about-icon">✍️</div>
+      <div class="about-title">GPT-2 Decoder</div>
+      <div class="about-desc">OpenAI's GPT-2 language model decodes the visual tokens into fluent natural language using beam search for high-quality caption generation.</div>
+    </div>
+    <div class="about-card">
+      <div class="about-icon">🎨</div>
+      <div class="about-title">Style Enhancement</div>
+      <div class="about-desc">A post-processing layer transforms the base caption into Short, Balanced, or Detailed formats using keyword analysis and template expansion.</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Built with <span>Flask · HuggingFace Transformers · ViT + GPT-2</span> &nbsp;·&nbsp; Harsh Ramesh Nerkar
+</footer>
+
+<div id="toast"></div>
+
+<script>
+  const uploadZone   = document.getElementById('uploadZone');
+  const imageInput   = document.getElementById('imageInput');
+  const previewWrap  = document.getElementById('previewWrap');
+  const previewImg   = document.getElementById('previewImg');
+  const changeBtn    = document.getElementById('changeBtn');
+  const styleSection = document.getElementById('styleSection');
+  const genWrap      = document.getElementById('genWrap');
+  const generateBtn  = document.getElementById('generateBtn');
+  const outputCard   = document.getElementById('outputCard');
+  const captionOutput= document.getElementById('captionOutput');
+  const loadingBar   = document.getElementById('loadingBar');
+  const loadingHint  = document.getElementById('loadingHint');
+  const toast        = document.getElementById('toast');
+
+  let currentFile   = null;
+  let selectedStyle = 'short';
+  let lastCaption   = '';
+
+  // ── Model status ────────────────────────────────────────────────────────────
+  async function checkModel() {
+    try {
+      const d = await (await fetch('/api/model_status')).json();
+      const el = document.getElementById('modelStatus');
+      const tx = document.getElementById('statusText');
+      if (d.loaded) {
+        el.classList.add('ready'); tx.textContent = 'Model Ready';
+      } else {
+        el.classList.add('error'); tx.textContent = 'Model Error';
+      }
+    } catch { document.getElementById('statusText').textContent = 'Offline'; }
+  }
+  checkModel();
+
+  // ── Upload ──────────────────────────────────────────────────────────────────
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault(); uploadZone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+  imageInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+
+  function loadFile(file) {
+    if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return; }
+    currentFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewImg.src = e.target.result;
+      uploadZone.style.display = 'none';
+      previewWrap.style.display = 'block';
+      styleSection.style.display = 'block';
+      genWrap.style.display = 'block';
+      outputCard.classList.remove('show');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  changeBtn.addEventListener('click', () => {
+    uploadZone.style.display = 'block';
+    previewWrap.style.display = 'none';
+    styleSection.style.display = 'none';
+    genWrap.style.display = 'none';
+    outputCard.classList.remove('show');
+    currentFile = null;
+    imageInput.value = '';
+  });
+
+  // ── Style selection ─────────────────────────────────────────────────────────
+  document.querySelectorAll('.style-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      selectedStyle = card.dataset.style;
+    });
+  });
+
+  // ── Generate ────────────────────────────────────────────────────────────────
+  generateBtn.addEventListener('click', async () => {
+    if (!currentFile) { showToast('Please upload an image first', 'error'); return; }
+
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Generating…`;
+    loadingBar.classList.add('show');
+    loadingHint.style.display = 'block';
+    outputCard.classList.remove('show');
+
+    const form = new FormData();
+    form.append('image', currentFile);
+    form.append('style', selectedStyle);
+
+    try {
+      const res  = await fetch('/api/generate_caption', { method: 'POST', body: form });
+      const data = await res.json();
+      if (data.success) {
+        renderCaption(data.caption, data.style);
+        showToast('Caption generated!', 'success');
+      } else {
+        throw new Error(data.error || 'Generation failed');
+      }
+    } catch (err) {
+      showToast(`Error: ${err.message}`, 'error');
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Generate Caption`;
+      loadingBar.classList.remove('show');
+      loadingHint.style.display = 'none';
+    }
+  });
+
+  function renderCaption(text, style) {
+    lastCaption = text;
+    const styleLabels = { short: '⚡ Short', balanced: '📖 Balanced', detailed: '📚 Detailed Story' };
+    const words = text.trim().split(/\s+/).length;
+
+    let cls = '';
+    if (style === 'short')    cls = 'caption-short';
+    if (style === 'balanced') cls = 'caption-balanced';
+    if (style === 'detailed') cls = 'caption-detailed';
+
+    captionOutput.innerHTML = `<div class="${cls}">${text}</div>`;
+    document.getElementById('stylePill').textContent  = styleLabels[style] || style;
+    document.getElementById('wordsPill').textContent  = `${words} words`;
+    outputCard.classList.add('show');
+    outputCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    navigator.clipboard.writeText(lastCaption).then(() => showToast('Copied to clipboard!', 'success'));
+  });
+
+  document.getElementById('speakBtn').addEventListener('click', () => {
+    if (!lastCaption) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(lastCaption);
+    speechSynthesis.speak(u);
+    showToast('Playing audio…');
+  });
+
+  // ── Toast ───────────────────────────────────────────────────────────────────
+  let toastTimer;
+  function showToast(msg, type = '') {
+    clearTimeout(toastTimer);
+    toast.textContent = msg;
+    toast.className = `show ${type}`;
+    toastTimer = setTimeout(() => toast.className = '', 3000);
+  }
+</script>
+</body>
+</html>

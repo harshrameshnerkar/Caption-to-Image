@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<!-- generated-showcase -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="ViT + GPT-2 image captioning in three styles: label, description, story">
+<title>CaptionAI — Image Captioning · Harsh Nerkar</title>
+<style>:root{--accent:#a78bfa;--accentglow:#a78bfa33}
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#070b14;--panel:#0d1322;--panel2:#111a2e;--line:rgba(148,163,184,.14);
+--txt:#e2e8f0;--dim:#94a3b8;--dimmer:#64748b}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+line-height:1.65;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1060px;margin:0 auto;padding:0 22px}
+nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(7,11,20,.8);
+border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;gap:14px;height:60px}
+.back{display:inline-flex;align-items:center;gap:7px;color:var(--dim);font-size:.9rem;
+padding:7px 13px;border:1px solid var(--line);border-radius:99px;transition:.2s;white-space:nowrap}
+.back:hover{color:var(--txt);border-color:var(--accent);transform:translateX(-2px)}
+.navtitle{font-weight:600;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.navcat{margin-left:auto;font-size:.75rem;color:var(--accent);border:1px solid var(--accent);
+padding:3px 11px;border-radius:99px;white-space:nowrap;opacity:.9}
+header.hero{position:relative;padding:84px 0 64px;text-align:center;overflow:hidden}
+.glow{position:absolute;inset:0;pointer-events:none;
+background:radial-gradient(600px 320px at 50% -40px,var(--accentglow),transparent 70%)}
+.badge-emoji{width:92px;height:92px;margin:0 auto 26px;display:flex;align-items:center;justify-content:center;
+font-size:46px;border-radius:26px;background:linear-gradient(160deg,var(--panel2),var(--panel));
+border:1px solid var(--line);box-shadow:0 0 60px var(--accentglow)}
+h1{font-size:clamp(1.7rem,4.5vw,2.9rem);font-weight:700;letter-spacing:-.02em;margin-bottom:14px}
+.tagline{color:var(--dim);font-size:clamp(1rem,2vw,1.15rem);max-width:640px;margin:0 auto 26px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:30px}
+.chip{font-size:.8rem;color:var(--dim);border:1px solid var(--line);background:var(--panel);
+padding:5px 13px;border-radius:99px}
+.chip b{color:var(--accent);font-weight:600}
+.cta{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#0a0f1a;
+font-weight:600;padding:11px 26px;border-radius:12px;font-size:.95rem;transition:.2s;margin:4px}
+.cta:hover{transform:translateY(-2px);box-shadow:0 8px 30px var(--accentglow)}
+.cta.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.cta.ghost:hover{border-color:var(--accent);box-shadow:none}
+main{padding-bottom:70px}
+section{margin-top:54px}
+h2{font-size:1.25rem;font-weight:650;margin-bottom:18px;display:flex;align-items:center;gap:10px}
+h2::before{content:"";width:22px;height:3px;border-radius:2px;background:var(--accent)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px}
+.desc{color:var(--dim);font-size:1rem}
+.metagrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:22px}
+.meta{background:var(--panel2);border:1px solid var(--line);border-radius:13px;padding:14px 16px}
+.meta .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dimmer);margin-bottom:4px}
+.meta .v{font-weight:600;font-size:.95rem}
+ul.feats{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+ul.feats li{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 18px;
+color:var(--dim);font-size:.93rem;display:flex;gap:11px;transition:.2s}
+ul.feats li:hover{border-color:var(--accent);transform:translateY(-2px)}
+ul.feats li::before{content:"✦";color:var(--accent);flex:none;margin-top:1px}
+.tech{display:flex;flex-wrap:wrap;gap:10px}
+.tech span{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
+padding:9px 16px;border-radius:12px;font-size:.88rem;transition:.2s}
+.tech span:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tech i{width:7px;height:7px;border-radius:50%;background:var(--accent);font-style:normal}
+.term{background:#0a0f1c;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.term-bar{display:flex;align-items:center;gap:7px;padding:11px 16px;border-bottom:1px solid var(--line);
+background:var(--panel2)}
+.term-bar i{width:11px;height:11px;border-radius:50%;font-style:normal}
+.term-bar i:nth-child(1){background:#f87171}.term-bar i:nth-child(2){background:#fbbf24}
+.term-bar i:nth-child(3){background:#34d399}
+.term-bar span{margin-left:auto;font-size:.75rem;color:var(--dimmer)}
+.term pre{padding:18px 20px;overflow-x:auto;font-family:Consolas,'Cascadia Code',monospace;
+font-size:.88rem;line-height:1.9;color:#cbd5e1}
+.term .p{color:var(--accent);user-select:none}
+.term .c{color:var(--dimmer)}
+.copy{margin-left:10px;background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;
+padding:3px 12px;font-size:.75rem;cursor:pointer;transition:.2s}
+.copy:hover{color:var(--txt);border-color:var(--accent)}
+.files{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.file{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+border-radius:12px;padding:11px 15px;font-size:.86rem;color:var(--dim);overflow:hidden;transition:.2s}
+.file:hover{border-color:var(--accent)}
+.file b{font-weight:500;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file.dir b{color:var(--accent)}
+footer{border-top:1px solid var(--line);padding:34px 0;text-align:center;color:var(--dimmer);font-size:.85rem}
+footer a{color:var(--accent)}
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .6s ease,transform .6s ease}
+.reveal.in{opacity:1;transform:none}
+@media(max-width:640px){
+ header.hero{padding:56px 0 44px}
+ .navcat{display:none}
+ .badge-emoji{width:74px;height:74px;font-size:38px;border-radius:20px}
+ .card{padding:20px}
+ ul.feats{grid-template-columns:1fr}
+ .files{grid-template-columns:1fr 1fr}
+}
+@media(max-width:420px){.files{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="back" href="../index.html">← All Projects</a>
+  <span class="navtitle">🖼️ CaptionAI — Image Captioning</span>
+  <span class="navcat">AI &amp; Agents</span>
+</div></nav>
+
+<header class="hero"><div class="glow"></div><div class="wrap">
+  <div class="badge-emoji">🖼️</div>
+  <h1>CaptionAI — Image Captioning</h1>
+  <p class="tagline">ViT + GPT-2 image captioning in three styles: label, description, story</p>
+  <div class="chips"><span class="chip"><b>●</b> AI &amp; Agents</span><span class='chip'>PyTorch</span><span class='chip'>TorchVision</span><span class='chip'>TorchAudio</span><span class='chip'>Transformers</span><span class='chip'>HF Datasets</span></div>
+  <a class="cta ghost" href="#run">Quick Start ↓</a>
+</div></header>
+
+<main class="wrap">
+  <section class="reveal"><h2>Overview</h2>
+    <div class="card"><p class="desc">An AI-powered web application that generates natural language captions for any image in three distinct styles: short labels, balanced descriptions, and rich story narratives. Built on Google&#x27;s Vision Transformer (ViT) and OpenAI&#x27;s GPT-2.</p>
+      <div class="metagrid">
+        <div class="meta"><div class="k">Category</div><div class="v">AI &amp; Agents</div></div>
+        <div class="meta"><div class="k">Built With</div><div class="v">Python</div></div>
+        <div class="meta"><div class="k">Author</div><div class="v">Harsh Nerkar</div></div>
+      </div>
+    </div>
+  </section>
+  
+  <section class="reveal"><h2>Tech Stack</h2><div class="tech"><span><i></i>PyTorch</span>
+<span><i></i>TorchVision</span>
+<span><i></i>TorchAudio</span>
+<span><i></i>Transformers</span>
+<span><i></i>HF Datasets</span>
+<span><i></i>Pillow</span>
+<span><i></i>Streamlit</span>
+<span><i></i>Matplotlib</span>
+<span><i></i>Seaborn</span>
+<span><i></i>pandas</span>
+<span><i></i>NumPy</span>
+<span><i></i>scikit-learn</span>
+<span><i></i>NLTK</span>
+<span><i></i>Requests</span>
+<span><i></i>tqdm</span>
+<span><i></i>W&amp;B</span></div></section>
+  <section id="run" class="reveal"><h2>Quick Start</h2>
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i><span>terminal<button class="copy" onclick="copyCmds(this)">Copy</button></span></div>
+      <pre><span class="p">$</span> pip install -r requirements.txt
+<span class="p">$</span> python app.py</pre>
+    </div>
+  </section>
+  <section class="reveal"><h2>Project Structure</h2><div class="files"><div class="file dir">📂 <b>Dataset/</b></div>
+<div class="file dir">📂 <b>checkpoints/</b></div>
+<div class="file dir">📂 <b>readme files/</b></div>
+<div class="file dir">📂 <b>static/</b></div>
+<div class="file dir">📂 <b>templates/</b></div>
+<div class="file dir">📂 <b>uploads/</b></div>
+<div class="file">📄 <b>README.md</b></div>
+<div class="file">🐍 <b>app.py</b></div>
+<div class="file">🐍 <b>dataset.py</b></div>
+<div class="file">🐍 <b>demo.py</b></div>
+<div class="file">🐍 <b>demo_enhanced_model.py</b></div>
+<div class="file">🐍 <b>enhanced_flask_app.py</b></div>
+<div class="file">🐍 <b>flask_app.py</b></div>
+<div class="file">🐍 <b>image_to_caption.py</b></div>
+<div class="file">🐍 <b>inference.py</b></div>
+<div class="file">📦 <b>install_pytorch.ps1</b></div>
+<div class="file">🧠 <b>model_9.h5</b></div>
+<div class="file">📄 <b>requirements-no-torch.txt</b></div>
+<div class="file">📄 <b>requirements.txt</b></div>
+<div class="file">📦 <b>run_inference.bat</b></div></div></section>
+</main>
+
+<footer><div class="wrap">
+  🖼️ <b>CaptionAI — Image Captioning</b> — built by Harsh Nerkar · <a href="../index.html">← Back to all projects</a>
+</div></footer>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.08});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+function copyCmds(btn){
+  const txt=btn.closest('.term').querySelector('pre').innerText.replace(/^\$\s?/gm,'');
+  const done=()=>{btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy',1600)};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done).catch(done)}
+  else{const t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();
+  try{document.execCommand('copy')}catch(e){}document.body.removeChild(t);done()}
+}
+</script>
+</body>
+</html>
