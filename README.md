@@ -1,188 +1,145 @@
-# CaptionAI — Intelligent Image Captioning System
+# 🖼️ Caption to Image — Intelligent Image Captioning System
 
-An AI-powered web application that generates natural language captions for any image in three distinct styles: short labels, balanced descriptions, and rich story narratives. Built on Google's Vision Transformer (ViT) and OpenAI's GPT-2 with a Flask backend.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Transformers](https://img.shields.io/badge/%F0%9F%A4%97-Transformers-yellow)](https://huggingface.co/docs/transformers)
+[![Flask](https://img.shields.io/badge/framework-Flask-black.svg)](https://flask.palletsprojects.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+An advanced AI-powered computer vision application that generates rich, descriptive natural language captions for any image in three distinct styles: **Short Labels**, **Balanced Descriptions**, and **Full Narrative Stories**. Built using Google's **Vision Transformer (ViT)** and OpenAI's **GPT-2** with an interactive **Flask** web dashboard.
 
 ---
 
-## Demo
+## 🌟 Demo & Caption Styles
 
-Upload any image → choose a style → get an AI-generated caption in seconds.
+Upload any image ➜ choose a generation style ➜ get an AI caption in seconds.
 
-| Style | Output |
+| Style | Output Description |
 |---|---|
-| **Short** | `"person sitting on park bench feeding pigeons"` (8–10 words) |
-| **Balanced** | Multi-sentence paragraph covering subjects, setting, colors, actions |
-| **Detailed** | Full narrative story — characters, setting, emotion, artistic analysis |
+| **Short** | `"A person sitting on a wooden park bench feeding pigeons."` *(8–10 words, ideal for Alt-Text)* |
+| **Balanced** | Structured multi-sentence paragraph covering subjects, setting, lighting, actions, and colors. |
+| **Detailed Story** | Immersive multi-paragraph narrative covering background lore, atmosphere, emotional depth, and artistic composition. |
 
 ---
 
-## How It Works
+## 🧠 Architecture Workflow
 
 ```
 Image Upload
     ↓
-ViT (Vision Transformer)
-  → Splits image into 16×16 patches
-  → Encodes patches as 768-dim visual tokens
+Vision Transformer (ViT - google/vit-base-patch16-224-in21k)
+  → Deconstructs image into 16×16 visual patches
+  → Encodes visual features into 768-dimensional token embeddings
     ↓
-VisionEncoderDecoderModel (HuggingFace)
-  → Cross-attention between visual tokens and language decoder
+VisionEncoderDecoder (HuggingFace)
+  → Cross-attention bridging visual tokens and GPT-2 language decoder
     ↓
 GPT-2 Decoder (Beam Search, n=5)
-  → Generates base caption
+  → Generates high-confidence foundational caption
     ↓
-Style Enhancement Layer
-  → Short:    keyword extraction → 8–10 word description
-  → Balanced: template expansion → multi-line paragraph
-  → Detailed: narrative generation → story format
+Style Transformation Engine
+  → Short:    Core subject & action extraction
+  → Balanced: Environment & contextual expansion
+  → Detailed: Atmospheric storytelling & composition breakdown
     ↓
-Web UI (Flask + HTML/CSS/JavaScript)
+Interactive Web Dashboard (Flask + HTML5 / CSS3 / JavaScript)
 ```
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
-| Component | Library / Model |
+| Component | Technology |
 |---|---|
-| Image encoder | `google/vit-base-patch16-224-in21k` |
-| Caption model | `nlpconnect/vit-gpt2-image-captioning` |
-| Language decoder | GPT-2 (`openai-community/gpt2`) |
-| Web framework | Flask + Flask-CORS |
-| Frontend | Vanilla HTML / CSS / JS (Responsive UI) |
-| ML framework | PyTorch + HuggingFace Transformers |
+| **Image Encoder** | Google Vision Transformer (`google/vit-base-patch16-224-in21k`) |
+| **Caption Model** | Vision-Encoder-Decoder (`nlpconnect/vit-gpt2-image-captioning`) |
+| **Language Decoder** | OpenAI GPT-2 (`gpt2`) |
+| **Deep Learning** | PyTorch + HuggingFace Transformers |
+| **Web Server** | Flask + Flask-CORS |
+| **Frontend UI** | Responsive Modern Glassmorphic Dashboard (HTML5, Vanilla CSS, JS) |
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 
 ```
-5_CAPTIONTOIMAGE/
-├── app.py                       # Main Flask web app entry point
-├── enhanced_flask_app.py        # Flask app
-├── inference.py                 # Custom model inference wrapper
+Caption-to-Image/
+├── app.py                       # Main Flask web server & REST API
+├── inference.py                 # Custom model inference & style generation wrapper
+├── config.py                    # Hyperparameters & model configuration
+├── story_model.py               # Long-form narrative generation logic
+├── setup.py                     # Package setup
+├── requirements.txt             # Python dependencies
+├── start_app.bat                # 1-click Windows launcher
+├── README.md                    # Complete documentation
+│
 ├── templates/
-│   ├── enhanced_index.html      # Professional web UI
-│   └── index.html
+│   ├── index.html               # Main interactive dashboard
+│   └── enhanced_index.html      # Glassmorphic UI template
+│
 ├── static/
-│   ├── style.css
-│   └── main.js
-├── uploads/                     # Temp uploaded images
-├── requirements.txt
-├── start_app.bat                # Windows launch script
-└── README.md
+│   ├── style.css                # Dark mode design system & animations
+│   └── main.js                  # Image preview, drag-and-drop & AJAX runner
+│
+└── uploads/                     # Temporary upload directory (.gitkeep)
 ```
 
 ---
 
-## Setup & Run
+## 🚀 Setup & Installation
 
-### 1. Install dependencies
+### 1. Clone the Repository
+```bash
+git clone https://github.com/harshrameshnerkar/Caption-to-Image.git
+cd Caption-to-Image
+```
 
+### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-> **Note:** `transformers` will download the ViT+GPT2 model (~900 MB) on first run. Subsequent runs use the local cache.
+> **Note**: On first run, HuggingFace `transformers` will automatically download the pre-trained ViT+GPT2 model weights (~900 MB). Subsequent runs load instantly from local cache.
 
-### 2. Run the Web App
-
+### 3. Launch the Application
 ```bash
 python app.py
 ```
+*(Or double-click `start_app.bat` on Windows)*
 
-*Alternatively:*
-```bash
-python enhanced_flask_app.py
-```
-*Or double-click `start_app.bat`.*
-
-### 3. Open in Browser
-
-```
-http://localhost:5000
-```
+Open your browser at **[http://localhost:5000](http://localhost:5000)**.
 
 ---
 
-## API Endpoints
+## 🔌 API Endpoints
 
-| Method | Route | Description |
+| Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/` | Web UI |
-| `POST` | `/api/generate_caption` | Generate caption for uploaded image |
-| `GET` | `/api/model_status` | Check if model is loaded |
-| `GET` | `/health` | Health check |
-
-### POST `/api/generate_caption`
-
-**Request** (multipart/form-data):
-```
-image  : image file (PNG/JPG/JPEG/GIF/BMP/WEBP, max 16MB)
-style  : "short" | "balanced" | "detailed"
-```
-
-**Response**:
-```json
-{
-  "caption": "...",
-  "style": "balanced",
-  "word_count": 87,
-  "success": true
-}
-```
+| `GET` | `/` | Web User Interface |
+| `POST` | `/api/generate_caption` | Generates a caption from an uploaded image (`image`, `style`) |
+| `GET` | `/api/model_status` | Returns model loading status |
+| `GET` | `/health` | Service health check |
 
 ---
 
-## Caption Styles
+## ⚡ Performance
 
-### Short
-Extracts key subjects, actions, and objects from the base model output. Returns an 8–10 word description suitable for alt-text or quick labeling.
-
-### Balanced
-Builds a structured paragraph by analyzing:
-- Primary subjects and their roles
-- Setting and environment type
-- Color palette references
-- Actions and behavioral cues
-- Artistic/compositional assessment
-
-### Detailed
-Generates an immersive narrative structured into rich thematic sections:
-1. Discovery / Opening
-2. Setting the Scene
-3. Character Development
-4. Emotional Journey
-5. Visual Symphony (composition analysis)
-6. Universal Themes
-7. Legacy / Conclusion
-
----
-
-## Performance
-
-| Hardware | Avg Generation Time |
+| Hardware | Average Inference Time |
 |---|---|
-| CPU only | 10–25 seconds |
-| NVIDIA GPU (CUDA) | 1–3 seconds |
+| **CPU Only** | ~8–15 seconds |
+| **NVIDIA GPU (CUDA)** | ~1–2 seconds |
 
-The model automatically uses CUDA if available:
-```python
-device = "cuda" if torch.cuda.is_available() else "cpu"
-```
+The model automatically detects and uses CUDA acceleration if available.
 
 ---
 
-## Requirements
+## 👤 Author
 
-- Python 3.10+
-- 4 GB RAM minimum (8 GB recommended)
-- Internet connection on first run (model download)
+**Harsh Nerkar**
+- GitHub: [@harshrameshnerkar](https://github.com/harshrameshnerkar)
+- Email: [harshrameshnerkar@gmail.com](mailto:harshrameshnerkar@gmail.com)
 
 ---
 
-## Author
-
-**Harsh Ramesh Nerkar**  
-B.Tech CSE 2026 | AI/ML Engineer  
-Email: harshrameshnerkar@gmail.com
+## 📄 License
+This project is licensed under the MIT License.
