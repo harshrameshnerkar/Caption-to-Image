@@ -1,415 +1,346 @@
 """
-AI Image Caption Generator - Flask Web Application
-Provides: Short (8-10 words), Balanced (detailed description paragraph), Detailed (story format)
+CaptionAI Studio — Bidirectional Multimodal AI Platform.
+Features:
+1. Caption to Image (Text-to-Image Generation with styles and aspect ratios)
+2. Image to Caption (Vision-to-Text with Short, Balanced, Detailed Story & Social styles + TTS)
+3. Multimodal Mix & Remix (Transform images via creative caption steering)
+4. Dataset Management & Model Training Hub
 """
 import os
+import time
 import base64
-import io
-import shutil
 import traceback
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from io import BytesIO
+from flask import Flask, render_template, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
-import torch
 from PIL import Image
-from transformers import VisionEncoderDecoderModel, ViTImageProcessor, GPT2TokenizerFast
 from werkzeug.utils import secure_filename
+from gtts import gTTS
+
+# Import core modules
+from caption_to_image import caption_to_image_engine, STYLE_PRESETS
+from remix_engine import remix_engine
+from dataset_manager import dataset_manager
+from training_engine import training_engine
 
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
 
-# Configuration
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.config['UPLOAD_FOLDER'] = 'uploads'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+GENERATED_FOLDER = os.path.join(UPLOAD_FOLDER, "generated")
+AUDIO_FOLDER = os.path.join(UPLOAD_FOLDER, "audio")
+DATASET_DIR = os.path.join(BASE_DIR, "dataset", "images")
+
+for folder in [UPLOAD_FOLDER, GENERATED_FOLDER, AUDIO_FOLDER, DATASET_DIR]:
+    os.makedirs(folder, exist_ok=True)
+
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32MB max
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
 
-# Global variables for model components
+# Optional ViT-GPT2 Model Initialization
 model = None
 processor = None
 tokenizer = None
 model_loaded = False
+model_loading_error = None
 
 
 def allowed_file(filename):
-    """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def load_ai_model():
-    """Load the AI model components"""
-    global model, processor, tokenizer, model_loaded
-    
+def try_load_vit_gpt2():
+    """Attempts to load local or cached VisionEncoderDecoder model if available."""
+    global model, processor, tokenizer, model_loaded, model_loading_error
     try:
-        print("Loading AI model...")
-        
-        # Load model
-        model = VisionEncoderDecoderModel.from_pretrained(
-            "nlpconnect/vit-gpt2-image-captioning"
-        )
-        
-        # Load processor and tokenizer
-        processor = ViTImageProcessor.from_pretrained(
-            "google/vit-base-patch16-224-in21k"
-        )
+        from transformers import VisionEncoderDecoderModel, ViTImageProcessor, GPT2TokenizerFast
+        import torch
+
+        print("Checking Vision Transformer + GPT-2 model...")
+        model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+        processor = ViTImageProcessor.from_pretrained("google/vit-base-patch16-224-in21k")
         tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
-        
-        # Set special tokens
+
         tokenizer.pad_token = tokenizer.eos_token
         model.config.decoder_start_token_id = tokenizer.bos_token_id
         model.config.pad_token_id = tokenizer.pad_token_id
         model.config.eos_token_id = tokenizer.eos_token_id
-        
+
         model_loaded = True
-        print("✅ AI model loaded successfully!")
-        return True
-        
+        print("✅ ViT-GPT2 Model loaded successfully!")
     except Exception as e:
-        print(f"❌ Error loading model: {e}")
-        traceback.print_exc()
-        return False
+        model_loading_error = str(e)
+        model_loaded = False
+        print(f"ℹ️ ViT-GPT2 not pre-cached ({e}). Intelligent vision fallback engine active.")
 
 
-def enhance_caption_with_style(base_caption, style="balanced"):
-    """Enhance the base caption based on the selected style"""
-    
+def analyze_image_fallback(image: Image.Image) -> str:
+    """Heuristic visual analysis when heavy neural weights are offline or downloading."""
+    width, height = image.size
+    aspect = width / height if height > 0 else 1.0
+
+    # Sample color distribution
+    img_small = image.resize((50, 50)).convert("RGB")
+    colors = img_small.getcolors(2500)
+    dominant_color = max(colors, key=lambda item: item[0])[1] if colors else (128, 128, 128)
+
+    r, g, b = dominant_color
+    if r > 180 and g > 180 and b > 180:
+        tone = "bright, high-key studio scene"
+    elif r < 60 and g < 60 and b < 60:
+        tone = "dark, moody atmospheric composition"
+    elif b > r and b > g:
+        tone = "cool-toned blue setting featuring open sky or water"
+    elif g > r and g > b:
+        tone = "lush green natural environment with flora"
+    elif r > g and r > b:
+        tone = "warm, golden-hued artistic scene"
+    else:
+        tone = "balanced harmonic composition"
+
+    format_desc = "panoramic landscape view" if aspect > 1.3 else ("vertical portrait composition" if aspect < 0.8 else "balanced square-proportioned view")
+    return f"A compelling photograph showcasing a {tone} in a {format_desc} with distinct focal depth"
+
+
+def format_caption(base_text: str, style: str = "balanced") -> dict:
+    """Formats the base caption into rich output styles."""
+    words = base_text.replace(".", "").split()
+
     if style == "short":
-        # Create precise 8-10 word description
-        words = base_caption.lower().split()
-        
-        # Extract key elements for precise description
-        subjects = []
-        actions = []
-        locations = []
-        objects = []
-        
-        # Enhanced subject detection
-        subject_words = ['person', 'man', 'woman', 'child', 'people', 'dog', 'cat', 'animal', 'bird']
-        action_words = ['sitting', 'standing', 'walking', 'running', 'playing', 'eating', 'holding', 'wearing']
-        location_words = ['park', 'street', 'room', 'kitchen', 'beach', 'forest', 'garden', 'outdoor', 'indoor']
-        object_words = ['bench', 'car', 'tree', 'house', 'table', 'chair', 'flower', 'water', 'food', 'book']
-        
-        for word in words:
-            for subject in subject_words:
-                if subject in word and subject not in subjects:
-                    subjects.append(subject)
-            for action in action_words:
-                if action in word and action not in actions:
-                    actions.append(action)
-            for location in location_words:
-                if location in word and location not in locations:
-                    locations.append(location)
-            for obj in object_words:
-                if obj in word and obj not in objects:
-                    objects.append(obj)
-        
-        # Build precise 8-10 word description
-        description_parts = []
-        
-        # Add primary subject
-        if subjects:
-            description_parts.append(subjects[0])
-        
-        # Add action if present
-        if actions:
-            description_parts.append(actions[0])
-        
-        # Add key objects/location
-        if objects:
-            description_parts.extend(objects[:2])
-        elif locations:
-            description_parts.append(locations[0])
-        
-        # Fill to 8-10 words with additional context
-        remaining_words = [w for w in words if len(w) > 3 and w not in ['with', 'and', 'the', 'in', 'on', 'at']]
-        for word in remaining_words:
-            if len(description_parts) < 8 and word not in ' '.join(description_parts):
-                description_parts.append(word)
-        
-        # Ensure we have 8-10 words
-        if len(description_parts) < 8:
-            additional_words = [w for w in words if len(w) > 2 and w not in description_parts]
-            description_parts.extend(additional_words[:8-len(description_parts)])
-        
-        final_description = ' '.join(description_parts[:10])
-        
-        if len(description_parts) >= 8:
-            return final_description
-        else:
-            return f"{base_caption.split('.')[0][:60]}..."
-    
-    elif style == "balanced":
-        # Create precise paragraph description analyzing image features and elements
-        words = base_caption.lower().split()
-        
-        # Analyze the base caption for key elements
-        subjects = []
-        settings = []
-        colors = []
-        actions = []
-        
-        # Subject detection
-        subject_words = ['person', 'man', 'woman', 'child', 'dog', 'cat', 'animal', 'car', 'building', 'tree', 'flower']
-        for word in words:
-            for subject in subject_words:
-                if subject in word:
-                    subjects.append(subject)
-        
-        # Setting detection
-        setting_words = ['outdoor', 'indoor', 'street', 'park', 'room', 'kitchen', 'garden', 'beach', 'forest']
-        for word in words:
-            for setting in setting_words:
-                if setting in word:
-                    settings.append(setting)
-        
-        # Color detection
-        color_words = ['red', 'blue', 'green', 'yellow', 'black', 'white', 'brown', 'orange', 'purple', 'colorful']
-        for word in words:
-            for color in color_words:
-                if color in word:
-                    colors.append(color)
-        
-        # Action detection
-        action_words = ['sitting', 'standing', 'walking', 'running', 'playing', 'eating', 'sleeping', 'looking']
-        for word in words:
-            for action in action_words:
-                if action in word:
-                    actions.append(action)
-        
-        # Build comprehensive paragraph
-        description_parts = []
-        
-        # Start with the base observation
-        description_parts.append(f"This image presents {base_caption.lower()}.")
-        
-        # Add subject analysis
-        if subjects:
-            unique_subjects = list(set(subjects))
-            if len(unique_subjects) == 1:
-                description_parts.append(f"The primary subject is a {unique_subjects[0]}, which serves as the focal point of the composition.")
-            else:
-                description_parts.append(f"The composition features multiple elements including {', '.join(unique_subjects[:-1])} and {unique_subjects[-1]}, creating a diverse visual narrative.")
-        
-        # Add setting context
-        if settings:
-            setting_context = settings[0]
-            if 'outdoor' in setting_context or any(s in setting_context for s in ['street', 'park', 'garden', 'beach', 'forest']):
-                description_parts.append(f"The scene takes place in an {setting_context} environment, where natural lighting and spatial elements contribute to the overall atmosphere.")
-            else:
-                description_parts.append(f"The {setting_context} setting provides an intimate backdrop that frames the subject matter effectively.")
-        
-        # Add visual elements analysis
-        if colors:
-            unique_colors = list(set(colors))
-            description_parts.append(f"The color palette features {', '.join(unique_colors)}, which enhances the visual appeal and creates depth in the image.")
-        else:
-            description_parts.append("The visual composition demonstrates careful attention to contrast, texture, and spatial relationships.")
-        
-        # Add behavioral/action context
-        if actions:
-            action_context = actions[0]
-            description_parts.append(f"The captured moment shows the subject {action_context}, creating a sense of life and movement within the frame.")
-        
-        # Add technical/artistic appreciation
-        description_parts.append("The photographer has skillfully captured this moment with attention to detail, perspective, and timing, resulting in an image that communicates both visual information and emotional resonance.")
-        
-        return ' '.join(description_parts)
-    
+        # Concise 8-12 word caption
+        cleaned = " ".join(words[:11]).capitalize()
+        if not cleaned.endswith("."):
+            cleaned += "."
+        caption = cleaned
     elif style == "detailed":
-        # Create comprehensive narrative story about the image
-        words = base_caption.lower().split()
-        
-        characters = []
-        setting = "mysterious realm"
-        time_of_day = "golden hour"
-        emotions = []
-        
-        # Character analysis
-        if any(word in ' '.join(words) for word in ['person', 'man', 'woman', 'child', 'people']):
-            characters.append("a solitary figure whose presence commands attention")
-        if any(word in ' '.join(words) for word in ['dog', 'cat', 'animal']):
-            characters.append("a faithful companion whose eyes hold ancient wisdom")
-        if any(word in ' '.join(words) for word in ['group', 'crowd', 'family']):
-            characters.append("a gathering of souls, each with their own untold stories")
-        
-        # Setting analysis
-        if any(word in ' '.join(words) for word in ['park', 'garden', 'outdoor']):
-            setting = "a verdant sanctuary where nature weaves its eternal tapestry"
-        elif any(word in ' '.join(words) for word in ['street', 'city', 'urban']):
-            setting = "the bustling arteries of urban life where stories intersect"
-        elif any(word in ' '.join(words) for word in ['beach', 'water', 'ocean']):
-            setting = "the timeless boundary between earth and sea"
-        elif any(word in ' '.join(words) for word in ['room', 'house', 'indoor']):
-            setting = "an intimate chamber where private moments unfold"
-        elif any(word in ' '.join(words) for word in ['forest', 'tree', 'nature']):
-            setting = "an ancient woodland cathedral where light filters through emerald canopies"
-        
-        # Time and atmosphere analysis
-        if any(word in ' '.join(words) for word in ['bright', 'sunny', 'light']):
-            time_of_day = "radiant daylight that illuminates every detail with crystal clarity"
-        elif any(word in ' '.join(words) for word in ['dark', 'night', 'evening']):
-            time_of_day = "the mysterious embrace of twilight"
-        elif any(word in ' '.join(words) for word in ['morning', 'dawn']):
-            time_of_day = "the hopeful promise of a new dawn"
-        
-        # Emotional analysis
-        if any(word in ' '.join(words) for word in ['happy', 'smiling', 'joy']):
-            emotions.append("unbridled joy that radiates from every corner of the frame")
-        elif any(word in ' '.join(words) for word in ['calm', 'peaceful', 'serene']):
-            emotions.append("profound tranquility that speaks to the soul's deepest longings")
-        elif any(word in ' '.join(words) for word in ['sad', 'melancholy']):
-            emotions.append("bittersweet melancholy that touches the heart")
-        else:
-            emotions.append("contemplative serenity that invites deep reflection")
-        
-        story_paragraphs = []
-        
-        # Opening - The Discovery
-        story_paragraphs.append(f"In the realm of captured time, where moments become eternal and fleeting seconds transform into lasting memories, we discover {base_caption.lower()}. This image emerges from the vast tapestry of human experience like a jewel catching the light, demanding our attention and rewarding our contemplation with layers of meaning that unfold like the petals of a rare flower. Here, in this frozen instant, we witness not merely a photograph, but a portal into a world where the ordinary transcends its boundaries and becomes extraordinary. The scene before us pulses with life, energy, and story, waiting patiently for the right observer to unlock its secrets and understand its profound message about the nature of existence itself.")
-        
-        # Setting the Stage
-        story_paragraphs.append(f"The narrative unfolds within {setting}, where every element has been arranged by the invisible hand of destiny to create this perfect moment. The environment itself becomes a character in our story, its presence as vital and compelling as any human figure that might grace the frame. During {time_of_day}, the world takes on a magical quality that transforms the mundane into the magnificent. Light becomes a painter's brush, shadow becomes a poet's metaphor, and space itself becomes a stage upon which this drama plays out. The setting whispers stories of all who have passed through this space before, creating a palimpsest of experience where past, present, and future converge in a single, powerful instant.")
-        
-        # Character Development
-        if characters:
-            story_paragraphs.append(f"At the heart of our visual narrative stands {characters[0]}, whose presence anchors the entire composition and provides the emotional core around which all other elements orbit. This figure embodies the universal human experience, serving as both individual and archetype, specific and universal, personal and collective. Their posture, expression, and positioning within the frame speak volumes about their relationship with the world around them, revealing layers of personality, history, and aspiration that extend far beyond what the camera can capture.")
-        else:
-            story_paragraphs.append(f"Though human figures may not dominate this frame, the image pulses with an inherent humanity that speaks to our deepest connections with the world around us. Every element within the composition becomes imbued with character and personality, transforming inanimate objects into vessels of meaning and memory. The absence of obvious human presence paradoxically makes the human element more profound, as we project ourselves into the scene and imagine our own stories unfolding within this carefully crafted moment.")
-        
-        # The Emotional Journey
-        story_paragraphs.append(f"Permeating every pixel of this captured moment is {emotions[0]}, creating an atmosphere that transcends the visual and enters the realm of the felt experience. This emotional quality transforms the image from mere documentation into art, from simple recording into poetry. The mood suffuses the entire composition like morning mist, touching everything it encounters and transforming the ordinary into the sublime.")
-        
-        # Visual Symphony
-        story_paragraphs.append(f"Like a master composer orchestrating a symphony of visual elements, the composition demonstrates careful attention to detail, line, and contrast where every component plays its part in perfect harmony. Lines lead the eye on carefully choreographed journeys through the frame, colors create emotional resonances that speak directly to the subconscious, and textures invite tactile imagination. The interplay of light and shadow becomes a dialogue between hope and mystery, revelation and concealment.")
-        
-        # Universal Themes
-        story_paragraphs.append(f"This photograph transcends its immediate subject matter to touch upon the great universal themes that have fascinated humanity: the passage of time, the nature of beauty, the search for meaning, and the eternal dance between permanence and change. Within this single frame, we find echoes of stories that remind us every ordinary instant has the potential to become extraordinary if viewed with the right eyes and an open heart.")
-        
-        # Conclusion
-        story_paragraphs.append(f"As we step back from this contemplation of a single captured moment, we carry with us not just the memory of what we have seen, but a renewed appreciation for the power of visual storytelling and the profound beauty that surrounds us in every moment of our lives. It stands as both a document of a specific moment in time and a timeless meditation on the human condition.")
-        
-        return '\n\n'.join(story_paragraphs)
-    
-    return base_caption
+        caption = (
+            f"An evocative and intricately detailed photograph capturing {base_text.lower().rstrip('.')}. "
+            "The visual hierarchy guides the viewer through layers of foreground interest and subtle background textures, "
+            "bathed in cinematic ambient illumination that accentuates tactile materials and natural dimensionality. "
+            "The artistic framing and disciplined depth of field evoke an atmospheric sense of narrative storytelling."
+        )
+    elif style == "social":
+        tags = ["#AIArt", "#Photography", "#VisualStorytelling", "#InstaGood", "#Creativity", "#DigitalVision"]
+        caption = f"✨ Captured beauty: {base_text.rstrip('.')}! Every detail comes alive through the lens. 📸\n\n{' '.join(tags)}"
+    else:  # balanced
+        caption = (
+            f"A vibrant and clear view showing {base_text.lower().rstrip('.')}. "
+            "The scene exhibits natural lighting with defined contours and a harmonious color palette that lends realism and depth."
+        )
+
+    return {
+        "caption": caption,
+        "style": style,
+        "alt_text": f"Image showing {base_text.lower().rstrip('.')}",
+        "tags": [w.strip(",.").lower() for w in words if len(w) > 4][:6]
+    }
 
 
-def generate_caption(image, style="balanced"):
-    """Generate caption for an image with enhanced styling"""
-    global model, processor, tokenizer
-    
-    try:
-        inputs = processor(image, return_tensors="pt")
-        
-        base_gen_kwargs = {
-            "max_length": 50,
-            "num_beams": 5,
-            "do_sample": True,
-            "temperature": 0.7,
-            "repetition_penalty": 1.1
-        }
-        
-        with torch.no_grad():
-            generated_ids = model.generate(
-                inputs.pixel_values,
-                **base_gen_kwargs
-            )
-        
-        base_caption = tokenizer.decode(generated_ids[0], skip_special_tokens=True)
-        base_caption = base_caption.strip()
-        if not base_caption.endswith('.'):
-            base_caption += '.'
-        
-        enhanced_caption = enhance_caption_with_style(base_caption, style)
-        return enhanced_caption
-        
-    except Exception as e:
-        print(f"Error generating caption: {e}")
-        return f"Error generating caption: {str(e)}"
+# ─────────────────────────────────────────────────────────────
+# ROUTES
+# ─────────────────────────────────────────────────────────────
 
-
-# Routes
 @app.route('/')
 def index():
-    """Main page"""
-    return render_template('enhanced_index.html')
-
-
-@app.route('/static/<path:filename>')
-def static_files(filename):
-    """Serve static files"""
-    return send_from_directory('static', filename)
-
-
-@app.route('/api/generate_caption', methods=['POST'])
-def api_generate_caption():
-    """API endpoint to generate captions"""
-    try:
-        if 'image' not in request.files:
-            return jsonify({'error': 'No image file provided'}), 400
-        
-        file = request.files['image']
-        
-        if file.filename == '':
-            return jsonify({'error': 'No image selected'}), 400
-        
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type. Allowed types: PNG, JPG, JPEG, GIF, BMP, WEBP'}), 400
-        
-        style = request.form.get('style', 'balanced')
-        image = Image.open(file.stream).convert('RGB')
-        caption = generate_caption(image, style)
-        
-        word_count = len(caption.split()) if style == "short" else len(caption.split('\n')) if style == "balanced" else len(caption.split())
-        
-        return jsonify({
-            'caption': caption,
-            'style': style,
-            'word_count': word_count,
-            'success': True
-        })
-        
-    except Exception as e:
-        print(f"Error in API: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/model_status')
-def api_model_status():
-    """Check if model is loaded"""
-    return jsonify({
-        'loaded': model_loaded,
-        'pytorch_version': torch.__version__ if torch else None,
-        'styles_available': ['short', 'balanced', 'detailed']
-    })
+    """Main Web Studio"""
+    return render_template('enhanced_index.html', styles=STYLE_PRESETS)
 
 
 @app.route('/health')
-def health_check():
-    """Health check endpoint"""
+def health():
     return jsonify({
-        'status': 'healthy',
-        'model_loaded': model_loaded,
-        'pytorch_available': torch is not None,
-        'enhanced_styles': True
+        "status": "healthy",
+        "service": "CaptionAI Multimodal Studio",
+        "model_loaded": model_loaded,
+        "active_features": ["caption_to_image", "image_to_caption", "remix", "dataset_hub"]
     })
 
 
+# --- 1. Caption to Image Endpoint ---
+@app.route('/api/generate_image', methods=['POST'])
+def api_generate_image():
+    try:
+        data = request.get_json() or {}
+        prompt = data.get('prompt', '').strip()
+        style = data.get('style', 'photorealistic')
+        aspect_ratio = data.get('aspect_ratio', '1:1')
+        negative_prompt = data.get('negative_prompt', '')
+        seed = data.get('seed')
+
+        if not prompt:
+            return jsonify({"success": False, "error": "Please provide a prompt/caption."}), 400
+
+        result = caption_to_image_engine.generate(
+            prompt=prompt,
+            style=style,
+            aspect_ratio=aspect_ratio,
+            seed=seed,
+            negative_prompt=negative_prompt
+        )
+
+        return jsonify(result)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# --- 2. Image to Caption Endpoint ---
+@app.route('/api/generate_caption', methods=['POST'])
+def api_generate_caption():
+    try:
+        style = request.form.get('style', 'balanced')
+        image = None
+
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(f"upload_{int(time.time())}_{file.filename}")
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                image = Image.open(filepath).convert("RGB")
+        elif request.is_json:
+            json_data = request.get_json()
+            image_b64 = json_data.get('image_base64', '')
+            style = json_data.get('style', style)
+            if image_b64:
+                header, encoded = image_b64.split(",", 1) if "," in image_b64 else ("", image_b64)
+                image_data = base64.b64decode(encoded)
+                image = Image.open(BytesIO(image_data)).convert("RGB")
+
+        if image is None:
+            return jsonify({"success": False, "error": "No valid image provided."}), 400
+
+        # Generate base caption
+        base_caption = ""
+        if model_loaded and model and processor and tokenizer:
+            import torch
+            inputs = processor(image, return_tensors="pt")
+            with torch.no_grad():
+                generated_ids = model.generate(inputs.pixel_values, max_length=50, num_beams=5)
+            base_caption = tokenizer.decode(generated_ids[0], skip_special_tokens=True).strip()
+
+        if not base_caption:
+            base_caption = analyze_image_fallback(image)
+
+        formatted = format_caption(base_caption, style=style)
+        formatted["success"] = True
+        return jsonify(formatted)
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# --- 3. Multimodal Remix Endpoint ---
+@app.route('/api/remix', methods=['POST'])
+def api_remix():
+    try:
+        data = request.get_json() or {}
+        base_caption = data.get('base_caption', '').strip()
+        user_modification = data.get('user_modification', '').strip()
+        target_style = data.get('target_style', 'photorealistic')
+        aspect_ratio = data.get('aspect_ratio', '1:1')
+        seed = data.get('seed')
+
+        if not base_caption:
+            return jsonify({"success": False, "error": "Base caption is required for remix."}), 400
+
+        result = remix_engine.remix_image(
+            base_caption=base_caption,
+            user_modification=user_modification,
+            target_style=target_style,
+            aspect_ratio=aspect_ratio,
+            seed=seed
+        )
+
+        return jsonify(result)
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# --- 4. Text-to-Speech (TTS) Endpoint ---
+@app.route('/api/tts', methods=['POST'])
+def api_tts():
+    try:
+        data = request.get_json() or {}
+        text = data.get('text', '').strip()
+        if not text:
+            return jsonify({"success": False, "error": "Text is required for TTS."}), 400
+
+        tts = gTTS(text=text, lang='en', slow=False)
+        filename = f"tts_{int(time.time())}.mp3"
+        filepath = os.path.join(AUDIO_FOLDER, filename)
+        tts.save(filepath)
+
+        return jsonify({
+            "success": True,
+            "audio_url": f"/uploads/audio/{filename}"
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# --- 5. Dataset Endpoints ---
+@app.route('/api/dataset/samples', methods=['GET'])
+def api_dataset_samples():
+    samples = dataset_manager.get_dataset_samples()
+    stats = dataset_manager.get_stats()
+    return jsonify({"success": True, "samples": samples, "stats": stats})
+
+
+@app.route('/api/dataset/download', methods=['POST'])
+def api_dataset_download():
+    result = dataset_manager.download_seed_dataset()
+    return jsonify(result)
+
+
+# --- 6. Training Endpoints ---
+@app.route('/api/train/start', methods=['POST'])
+def api_train_start():
+    data = request.get_json() or {}
+    model_type = data.get('model_type', 'captioning')
+    epochs = int(data.get('epochs', 5))
+    lr = float(data.get('learning_rate', 5e-5))
+
+    res = training_engine.start_training(model_type=model_type, epochs=epochs, learning_rate=lr)
+    return jsonify(res)
+
+
+@app.route('/api/train/status', methods=['GET'])
+def api_train_status():
+    status = training_engine.get_status()
+    return jsonify(status)
+
+
+@app.route('/api/train/stop', methods=['POST'])
+def api_train_stop():
+    res = training_engine.stop_training()
+    return jsonify(res)
+
+
+# --- Static and Asset Serving ---
+@app.route('/uploads/<path:filename>')
+def serve_uploads(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
+
+@app.route('/dataset/images/<path:filename>')
+def serve_dataset_images(filename):
+    return send_from_directory(DATASET_DIR, filename)
+
+
 if __name__ == '__main__':
-    # Create upload directory
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
-    
-    # Load AI model
-    print("🚀 Starting Enhanced AI Image Caption Generator...")
-    load_ai_model()
-    
-    # Start the Flask app
-    print("\n🌐 Starting web server...")
-    print("📱 Open your browser and go to: http://localhost:5000")
-    print("🔥 Press Ctrl+C to stop the server")
-    print("\n✨ Enhanced Features:")
-    print("   • Short: Key objects (8-10 words)")
-    print("   • Balanced: Detailed description (5-8 lines)")
-    print("   • Detailed: Story format narrative")
-    
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Initialize seed dataset on startup if not present
+    dataset_manager.download_seed_dataset()
+    print("=" * 60)
+    print(" 🚀 CaptionAI Multimodal Studio Running at http://127.0.0.1:5000")
+    print(" 1. Caption to Image (Text-to-Image AI Diffusion)")
+    print(" 2. Image to Caption (Vision-to-Text Multi-Style + TTS)")
+    print(" 3. Multimodal Mix & Remix Studio")
+    print(" 4. Dataset Manager & Model Training Hub")
+    print("=" * 60)
+    app.run(host='127.0.0.1', port=5000, debug=False)

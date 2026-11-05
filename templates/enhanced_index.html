@@ -3,663 +3,1012 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CaptionAI — Intelligent Image Captioning</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <title>CaptionAI — Bidirectional Multimodal Vision Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
     :root {
-      --bg:      #07090f;
-      --surface: #0d1117;
-      --glass:   rgba(255,255,255,0.04);
-      --border:  rgba(255,255,255,0.07);
-      --purple:  #8b5cf6;
-      --pink:    #ec4899;
-      --blue:    #3b82f6;
-      --text:    #f1f5f9;
-      --muted:   #64748b;
-      --green:   #10b981;
-      --red:     #ef4444;
+      --bg: #090d16;
+      --card-bg: rgba(17, 24, 39, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --purple: #8b5cf6;
+      --pink: #ec4899;
+      --blue: #3b82f6;
+      --cyan: #06b6d4;
+      --green: #10b981;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
     }
 
-    html { scroll-behavior: smooth; }
-
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Plus Jakarta Sans', sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(139, 92, 246, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(236, 72, 153, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.06) 0%, transparent 50%);
     }
 
-    /* Ambient blobs */
-    body::before {
-      content: '';
-      position: fixed; inset: 0; z-index: 0; pointer-events: none;
-      background:
-        radial-gradient(ellipse 70% 50% at 20% 10%, rgba(139,92,246,0.08), transparent),
-        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(236,72,153,0.06), transparent);
-    }
-
-    /* ── Navbar ── */
+    /* Navbar */
     nav {
-      position: sticky; top: 0; z-index: 100;
+      position: sticky; top: 0; z-index: 50;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 40px; height: 64px;
-      background: rgba(7,9,15,0.85);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
+      padding: 0 32px; height: 70px;
+      background: rgba(9, 13, 22, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--card-border);
     }
-    .nav-logo {
-      font-size: 1.15rem; font-weight: 800; letter-spacing: -.3px;
+    .logo {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 1.25rem; font-weight: 800; letter-spacing: -0.5px;
+    }
+    .logo-icon {
+      width: 38px; height: 38px; border-radius: 10px;
       background: linear-gradient(135deg, var(--purple), var(--pink));
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 1.1rem;
+      box-shadow: 0 4px 15px rgba(236, 72, 153, 0.3);
+    }
+    .logo-text span {
+      background: linear-gradient(135deg, #a78bfa, #f472b6);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
     }
-    .nav-links { display: flex; gap: 28px; }
-    .nav-links a {
-      font-size: .85rem; color: var(--muted); text-decoration: none;
-      font-weight: 500; transition: color .2s;
+    .badge-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399; font-size: 0.75rem; font-weight: 600;
+      padding: 4px 12px; border-radius: 20px;
     }
-    .nav-links a:hover { color: var(--text); }
-    .nav-status {
-      display: flex; align-items: center; gap: 7px;
-      padding: 5px 14px; border-radius: 20px; font-size: .75rem; font-weight: 600;
-      border: 1px solid rgba(255,255,255,.1); color: var(--muted);
-      transition: all .3s;
+    .pulse-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: #10b981; box-shadow: 0 0 8px #10b981;
+      animation: pulse 2s infinite;
     }
-    .nav-status.ready  { color: var(--green); border-color: rgba(16,185,129,.3); background: rgba(16,185,129,.07); }
-    .nav-status.error  { color: var(--red);   border-color: rgba(239,68,68,.3);  background: rgba(239,68,68,.07); }
-    .nav-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
 
-    /* ── Hero ── */
+    /* Main Container */
+    .container {
+      max-width: 1200px; margin: 0 auto;
+      padding: 32px 24px 80px 24px;
+    }
+
+    /* Hero */
     .hero {
-      position: relative; z-index: 1;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      text-align: center;
-      padding: 80px 24px 60px;
+      text-align: center; margin-bottom: 36px;
     }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 16px; border-radius: 20px;
-      background: rgba(139,92,246,.1); border: 1px solid rgba(139,92,246,.25);
-      color: var(--purple); font-size: .75rem; font-weight: 600;
-      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 24px;
-    }
-    .hero-title {
-      font-size: clamp(2.4rem, 5vw, 4rem);
-      font-weight: 800; line-height: 1.1; margin-bottom: 20px;
-      letter-spacing: -.5px;
-    }
-    .hero-title .grad {
-      background: linear-gradient(135deg, var(--purple) 0%, var(--pink) 60%, #f97316 100%);
+    .hero h1 {
+      font-size: 2.5rem; font-weight: 800; letter-spacing: -1px;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #ffffff 40%, #cbd5e1);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
     }
-    .hero-sub {
-      font-size: 1.05rem; color: var(--muted); max-width: 520px;
-      line-height: 1.75; margin-bottom: 40px;
+    .hero p {
+      font-size: 1.05rem; color: var(--text-muted); max-width: 680px; margin: 0 auto;
+      line-height: 1.6;
     }
-    .hero-cta {
-      display: inline-flex; align-items: center; gap: 10px;
-      padding: 14px 36px; border-radius: 50px; font-size: .95rem; font-weight: 700;
-      background: linear-gradient(135deg, var(--purple), var(--pink));
-      color: white; text-decoration: none; border: none; cursor: pointer;
-      box-shadow: 0 0 40px rgba(139,92,246,.35);
-      transition: transform .2s, box-shadow .2s;
-    }
-    .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 0 60px rgba(139,92,246,.5); }
-    .hero-cta svg { width: 18px; height: 18px; }
 
-    /* ── Feature chips ── */
-    .feature-chips {
-      display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
-      margin-top: 52px;
+    /* Tab Switcher */
+    .tabs-wrapper {
+      display: flex; justify-content: center; margin-bottom: 36px;
+    }
+    .tabs-nav {
+      display: inline-flex; gap: 6px; padding: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      border-radius: 16px; backdrop-filter: blur(12px);
+    }
+    .tab-btn {
+      padding: 10px 22px; border-radius: 12px; border: none;
+      background: transparent; color: var(--text-muted);
+      font-size: 0.9rem; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      transition: all 0.25s ease;
+    }
+    .tab-btn:hover {
+      color: var(--text); background: rgba(255, 255, 255, 0.04);
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--purple), var(--blue));
+      color: white; box-shadow: 0 4px 20px rgba(139, 92, 246, 0.35);
+    }
+
+    /* Tab Panes */
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; animation: fadeIn 0.35s ease forwards; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Studio Card */
+    .studio-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 32px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    }
+    .card-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 32px;
+    }
+    @media (max-width: 900px) {
+      .card-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Form Controls */
+    .form-group { margin-bottom: 22px; }
+    .form-label {
+      display: block; font-size: 0.85rem; font-weight: 600;
+      color: #e2e8f0; margin-bottom: 8px; letter-spacing: 0.2px;
+    }
+    .textarea-input, .text-input, .select-input {
+      width: 100%; background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px; padding: 14px 16px;
+      color: var(--text); font-family: inherit; font-size: 0.95rem;
+      outline: none; transition: border-color 0.2s;
+    }
+    .textarea-input:focus, .text-input:focus, .select-input:focus {
+      border-color: var(--purple); box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+    }
+    .textarea-input { resize: vertical; min-height: 110px; }
+
+    /* Chip selectors */
+    .chips-group {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px;
     }
     .chip {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 18px; border-radius: 14px;
-      background: var(--glass); border: 1px solid var(--border);
-      font-size: .82rem; font-weight: 500; color: var(--muted);
-      backdrop-filter: blur(8px);
+      padding: 7px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;
+      background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border);
+      color: var(--text-muted); cursor: pointer; transition: all 0.2s;
     }
-    .chip-icon { font-size: 1.1rem; }
-
-    /* ── Generator section ── */
-    #generator {
-      position: relative; z-index: 1;
-      max-width: 980px; margin: 0 auto;
-      padding: 0 24px 80px;
-    }
-    .section-label {
-      text-align: center; margin-bottom: 32px;
-    }
-    .section-label h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; }
-    .section-label p  { font-size: .9rem; color: var(--muted); }
-
-    /* Upload zone */
-    .upload-zone {
-      border: 2px dashed rgba(139,92,246,.3);
-      border-radius: 20px; padding: 48px 24px;
-      text-align: center; cursor: pointer;
-      background: rgba(139,92,246,.04);
-      transition: border-color .25s, background .25s;
-      position: relative;
-    }
-    .upload-zone:hover, .upload-zone.drag-over {
-      border-color: var(--purple); background: rgba(139,92,246,.08);
-    }
-    .upload-zone input[type=file] {
-      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
-    }
-    .upload-icon-wrap {
-      width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 16px;
-      background: rgba(139,92,246,.12); display: flex; align-items: center; justify-content: center;
-    }
-    .upload-icon-wrap svg { width: 28px; height: 28px; color: var(--purple); }
-    .upload-zone h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 6px; }
-    .upload-zone p  { font-size: .82rem; color: var(--muted); }
-    .upload-btn-fake {
-      display: inline-block; margin-top: 16px; padding: 9px 24px; border-radius: 30px;
-      background: rgba(139,92,246,.15); border: 1px solid rgba(139,92,246,.3);
-      color: var(--purple); font-size: .82rem; font-weight: 600;
-      pointer-events: none;
+    .chip:hover { color: white; border-color: rgba(255, 255, 255, 0.2); }
+    .chip.selected {
+      background: rgba(139, 92, 246, 0.2); border-color: var(--purple); color: #c4b5fd;
     }
 
-    /* Preview */
-    .preview-wrap { display: none; }
-    .preview-inner {
-      position: relative; border-radius: 16px; overflow: hidden;
-      background: var(--surface); border: 1px solid var(--border);
-    }
-    .preview-inner img {
-      width: 100%; max-height: 380px; object-fit: contain; display: block;
-    }
-    .preview-change {
-      position: absolute; top: 12px; right: 12px;
-      padding: 7px 16px; border-radius: 20px; font-size: .75rem; font-weight: 600;
-      background: rgba(0,0,0,.7); border: 1px solid rgba(255,255,255,.15);
-      color: var(--text); cursor: pointer; backdrop-filter: blur(6px);
-      transition: background .2s;
-    }
-    .preview-change:hover { background: rgba(139,92,246,.4); }
-
-    /* Style selector */
-    .style-section { margin-top: 28px; }
-    .style-label {
-      font-size: .72rem; color: var(--muted); text-transform: uppercase;
-      letter-spacing: 1.5px; font-weight: 600; margin-bottom: 12px;
-    }
-    .style-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
-    .style-card {
-      padding: 16px; border-radius: 14px; cursor: pointer;
-      background: var(--glass); border: 1px solid var(--border);
-      transition: all .2s; text-align: center;
-    }
-    .style-card:hover { border-color: rgba(139,92,246,.4); background: rgba(139,92,246,.06); }
-    .style-card.active {
-      border-color: var(--purple); background: rgba(139,92,246,.1);
-      box-shadow: 0 0 20px rgba(139,92,246,.15);
-    }
-    .style-card-icon { font-size: 1.6rem; margin-bottom: 8px; }
-    .style-card-name { font-size: .88rem; font-weight: 600; margin-bottom: 4px; }
-    .style-card-desc { font-size: .72rem; color: var(--muted); line-height: 1.4; }
-
-    /* Generate button */
-    .gen-wrap { margin-top: 24px; text-align: center; }
-    #generateBtn {
-      display: inline-flex; align-items: center; gap: 10px;
-      padding: 15px 44px; border-radius: 50px; font-size: 1rem; font-weight: 700;
+    /* Buttons */
+    .btn-primary {
+      width: 100%; padding: 14px 24px; border-radius: 14px; border: none;
       background: linear-gradient(135deg, var(--purple), var(--pink));
-      color: white; border: none; cursor: pointer;
-      box-shadow: 0 0 32px rgba(139,92,246,.35);
-      transition: transform .2s, box-shadow .2s, opacity .2s;
+      color: white; font-size: 1rem; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 20px rgba(236, 72, 153, 0.35);
     }
-    #generateBtn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 0 50px rgba(139,92,246,.5); }
-    #generateBtn:disabled { opacity: .6; cursor: not-allowed; }
-    #generateBtn svg { width: 18px; height: 18px; }
+    .btn-primary:hover {
+      transform: translateY(-2px); box-shadow: 0 6px 25px rgba(236, 72, 153, 0.5);
+    }
+    .btn-primary:disabled {
+      opacity: 0.6; cursor: not-allowed; transform: none;
+    }
 
-    /* Spinner */
-    .spin { animation: spin 1s linear infinite; }
+    .btn-secondary {
+      padding: 8px 16px; border-radius: 10px; border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.06); color: var(--text);
+      font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;
+    }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
+
+    /* Upload Zone */
+    .upload-zone {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 16px; padding: 36px 20px; text-align: center;
+      background: rgba(15, 23, 42, 0.4); cursor: pointer;
+      transition: all 0.25s ease; position: relative;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--cyan); background: rgba(6, 182, 212, 0.05);
+    }
+    .upload-icon {
+      font-size: 2.2rem; color: var(--cyan); margin-bottom: 12px;
+    }
+    .upload-preview {
+      width: 100%; max-height: 280px; object-fit: contain;
+      border-radius: 12px; display: none; margin-top: 12px;
+      border: 1px solid var(--card-border);
+    }
+
+    /* Output Card */
+    .output-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 16px; padding: 24px;
+      min-height: 380px; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; text-align: center;
+    }
+    .output-box.has-content {
+      align-items: stretch; text-align: left; justify-content: flex-start;
+    }
+    .output-image {
+      width: 100%; max-height: 420px; object-fit: contain;
+      border-radius: 12px; border: 1px solid var(--card-border);
+      margin-bottom: 16px; background: #000;
+    }
+    .caption-result-text {
+      font-size: 1.05rem; line-height: 1.7; color: #f1f5f9;
+      background: rgba(255, 255, 255, 0.03); padding: 18px;
+      border-radius: 12px; border-left: 4px solid var(--purple);
+      margin-bottom: 16px; white-space: pre-line;
+    }
+
+    /* Loading Spinner */
+    .spinner {
+      display: inline-block; width: 22px; height: 22px;
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Loading bar */
-    .loading-bar {
-      display: none; margin: 20px auto 0; max-width: 360px;
-      height: 3px; border-radius: 3px; background: rgba(255,255,255,.07);
-      overflow: hidden;
-    }
-    .loading-bar.show { display: block; }
-    .loading-bar::after {
-      content: ''; display: block; height: 100%;
-      background: linear-gradient(90deg, var(--purple), var(--pink));
-      border-radius: 3px;
-      animation: loading-slide 1.5s ease-in-out infinite;
-    }
-    @keyframes loading-slide {
-      0%   { transform: translateX(-100%); }
-      100% { transform: translateX(300%); }
-    }
-    .loading-hint { text-align: center; font-size: .8rem; color: var(--muted); margin-top: 10px; }
-
-    /* Output card */
-    .output-card {
-      display: none; margin-top: 28px;
-      background: var(--glass); border: 1px solid rgba(139,92,246,.2);
-      border-radius: 20px; overflow: hidden;
-      box-shadow: 0 0 40px rgba(139,92,246,.08);
-      animation: fade-up .35s ease;
-    }
-    .output-card.show { display: block; }
-    @keyframes fade-up { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
-
-    .output-head {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 20px; border-bottom: 1px solid var(--border);
-      background: rgba(255,255,255,.02);
-    }
-    .output-title {
-      display: flex; align-items: center; gap: 8px;
-      font-size: .78rem; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 1.2px; color: var(--purple);
-    }
-    .output-actions { display: flex; gap: 8px; }
-    .action-btn {
-      padding: 6px 14px; border-radius: 20px; font-size: .75rem; font-weight: 600;
-      border: 1px solid var(--border); background: transparent; color: var(--muted);
-      cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 6px;
-    }
-    .action-btn:hover { color: var(--text); border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.05); }
-    .action-btn svg { width: 13px; height: 13px; }
-
-    .output-body { padding: 24px; }
-
-    .caption-short {
-      font-size: 1.8rem; font-weight: 700; text-align: center;
-      background: linear-gradient(135deg, var(--purple), var(--pink));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text; padding: 16px 0;
-    }
-    .caption-balanced {
-      font-size: .95rem; line-height: 1.85; color: var(--text);
-      white-space: pre-line;
-    }
-    .caption-detailed {
-      font-size: .9rem; line-height: 1.85; color: var(--text);
-      max-height: 420px; overflow-y: auto; padding-right: 8px;
-    }
-    .caption-detailed::-webkit-scrollbar { width: 4px; }
-    .caption-detailed::-webkit-scrollbar-thumb { background: rgba(139,92,246,.3); border-radius: 4px; }
-
-    .output-footer {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 20px; border-top: 1px solid var(--border);
-      background: rgba(255,255,255,.015);
-    }
-    .output-meta { font-size: .72rem; color: var(--muted); display: flex; gap: 14px; }
-    .meta-pill {
-      display: flex; align-items: center; gap: 5px;
-      padding: 3px 10px; border-radius: 12px;
-      background: rgba(139,92,246,.08); border: 1px solid rgba(139,92,246,.15);
-      color: var(--purple);
+    /* Tag badges */
+    .tag-pill {
+      display: inline-block; padding: 4px 10px; border-radius: 6px;
+      background: rgba(139, 92, 246, 0.15); color: #c4b5fd;
+      font-size: 0.75rem; font-weight: 600; margin-right: 6px; margin-bottom: 6px;
     }
 
-    /* Toast */
-    #toast {
-      position: fixed; bottom: 28px; right: 28px; z-index: 300;
-      padding: 12px 20px; border-radius: 12px; font-size: .85rem; font-weight: 500;
-      background: var(--surface); border: 1px solid var(--border);
-      color: var(--text); transform: translateY(80px); opacity: 0;
-      transition: all .3s; pointer-events: none;
+    /* Dataset Cards */
+    .dataset-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 18px; margin-top: 20px;
     }
-    #toast.show { transform: translateY(0); opacity: 1; }
-    #toast.success { border-color: rgba(16,185,129,.4); color: var(--green); }
-    #toast.error   { border-color: rgba(239,68,68,.4);  color: var(--red); }
+    .dataset-item {
+      background: rgba(15, 23, 42, 0.7); border: 1px solid var(--card-border);
+      border-radius: 14px; overflow: hidden; transition: transform 0.2s;
+    }
+    .dataset-item:hover { transform: translateY(-4px); }
+    .dataset-img {
+      width: 100%; height: 160px; object-fit: cover;
+    }
+    .dataset-info { padding: 14px; }
+    .dataset-caption {
+      font-size: 0.85rem; color: #cbd5e1; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
 
-    /* ── About / tech section ── */
-    #about {
-      position: relative; z-index: 1;
-      max-width: 980px; margin: 0 auto; padding: 0 24px 80px;
+    /* Training Console */
+    .console-box {
+      background: #050811; border: 1px solid var(--card-border);
+      border-radius: 12px; padding: 16px; font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem; color: #34d399; min-height: 180px; max-height: 260px;
+      overflow-y: auto; text-align: left;
     }
-    .about-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 32px; }
-    .about-card {
-      background: var(--glass); border: 1px solid var(--border);
-      border-radius: 16px; padding: 22px;
-      backdrop-filter: blur(8px);
-      transition: border-color .2s, transform .2s;
+    .stat-badge {
+      background: rgba(255,255,255,0.05); border: 1px solid var(--card-border);
+      border-radius: 12px; padding: 16px; text-align: center;
     }
-    .about-card:hover { border-color: rgba(139,92,246,.3); transform: translateY(-3px); }
-    .about-icon { font-size: 1.6rem; margin-bottom: 12px; }
-    .about-title { font-size: .92rem; font-weight: 700; margin-bottom: 6px; }
-    .about-desc { font-size: .8rem; color: var(--muted); line-height: 1.6; }
-
-    /* ── Footer ── */
-    footer {
-      position: relative; z-index: 1;
-      text-align: center; padding: 28px;
-      border-top: 1px solid var(--border);
-      font-size: .8rem; color: var(--muted);
-    }
-    footer span { color: var(--purple); }
-
-    @media (max-width: 700px) {
-      .style-grid { grid-template-columns: 1fr; }
-      .about-grid { grid-template-columns: 1fr; }
-      .nav-links { display: none; }
-      nav { padding: 0 20px; }
-    }
+    .stat-val { font-size: 1.8rem; font-weight: 800; color: white; }
+    .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
   </style>
 </head>
 <body>
 
-<!-- Navbar -->
-<nav>
-  <div class="nav-logo">CaptionAI</div>
-  <div class="nav-links">
-    <a href="#generator">Try Now</a>
-    <a href="#about">How It Works</a>
-  </div>
-  <div class="nav-status" id="modelStatus">
-    <div class="nav-dot"></div>
-    <span id="statusText">Checking model…</span>
-  </div>
-</nav>
-
-<!-- Hero -->
-<section class="hero">
-  <div class="hero-badge">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
-    ViT + GPT-2 · Transformer Architecture
-  </div>
-  <h1 class="hero-title">
-    Turn Any Image Into<br><span class="grad">Intelligent Captions</span>
-  </h1>
-  <p class="hero-sub">
-    Upload a photo and get AI-generated descriptions in three styles —
-    from quick labels to rich storytelling narratives.
-  </p>
-  <a href="#generator" class="hero-cta">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 3l14 9-14 9V3z"/></svg>
-    Try the Generator
-  </a>
-  <div class="feature-chips">
-    <div class="chip"><span class="chip-icon">⚡</span> Short captions</div>
-    <div class="chip"><span class="chip-icon">📖</span> Detailed descriptions</div>
-    <div class="chip"><span class="chip-icon">📚</span> Story narratives</div>
-    <div class="chip"><span class="chip-icon">🔊</span> Text to speech</div>
-    <div class="chip"><span class="chip-icon">📋</span> One-click copy</div>
-  </div>
-</section>
-
-<!-- Generator -->
-<section id="generator">
-  <div class="section-label">
-    <h2>Caption Generator</h2>
-    <p>Drop an image and choose your style</p>
-  </div>
-
-  <!-- Upload zone -->
-  <div class="upload-zone" id="uploadZone">
-    <input type="file" id="imageInput" accept="image/*" />
-    <div class="upload-icon-wrap">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+  <!-- Navigation -->
+  <nav>
+    <div class="logo">
+      <div class="logo-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+      <div class="logo-text">Caption<span>AI</span> Studio</div>
     </div>
-    <h3>Drop your image here</h3>
-    <p>PNG, JPG, JPEG, GIF · Up to 16 MB</p>
-    <div class="upload-btn-fake">Browse Files</div>
-  </div>
-
-  <!-- Preview -->
-  <div class="preview-wrap" id="previewWrap">
-    <div class="preview-inner">
-      <img id="previewImg" src="" alt="Preview" />
-      <button class="preview-change" id="changeBtn">↺ Change image</button>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div class="badge-status">
+        <span class="pulse-dot"></span>
+        <span>Multimodal Engine Online</span>
+      </div>
+      <a href="https://github.com/harshrameshnerkar/Caption-to-Image" target="_blank" class="btn-secondary" style="text-decoration: none;">
+        <i class="fa-brands fa-github"></i> Repository
+      </a>
     </div>
-  </div>
+  </nav>
 
-  <!-- Style selector -->
-  <div class="style-section" id="styleSection" style="display:none">
-    <div class="style-label">Choose caption style</div>
-    <div class="style-grid">
-      <div class="style-card active" data-style="short">
-        <div class="style-card-icon">⚡</div>
-        <div class="style-card-name">Short</div>
-        <div class="style-card-desc">8–10 word quick label identifying key subjects</div>
-      </div>
-      <div class="style-card" data-style="balanced">
-        <div class="style-card-icon">📖</div>
-        <div class="style-card-name">Balanced</div>
-        <div class="style-card-desc">Multi-sentence paragraph covering all visual aspects</div>
-      </div>
-      <div class="style-card" data-style="detailed">
-        <div class="style-card-icon">📚</div>
-        <div class="style-card-name">Detailed Story</div>
-        <div class="style-card-desc">Rich narrative with characters, setting, and emotion</div>
-      </div>
+  <!-- Main Container -->
+  <div class="container">
+    
+    <!-- Hero Header -->
+    <div class="hero">
+      <h1>Bidirectional Multimodal AI Vision Studio</h1>
+      <p>Seamlessly generate high-fidelity images from natural language captions, extract rich multi-style descriptions from images, remix visual concepts, and train your models.</p>
     </div>
-  </div>
 
-  <!-- Generate -->
-  <div class="gen-wrap" id="genWrap" style="display:none">
-    <button id="generateBtn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-      Generate Caption
-    </button>
-    <div class="loading-bar" id="loadingBar"></div>
-    <div class="loading-hint" id="loadingHint" style="display:none">AI is analyzing your image… this may take 5–20 seconds</div>
-  </div>
-
-  <!-- Output -->
-  <div class="output-card" id="outputCard">
-    <div class="output-head">
-      <div class="output-title">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        Generated Caption
-      </div>
-      <div class="output-actions">
-        <button class="action-btn" id="copyBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Copy
+    <!-- Tabs Navigation -->
+    <div class="tabs-wrapper">
+      <div class="tabs-nav">
+        <button class="tab-btn active" onclick="switchTab('caption-to-image')">
+          <i class="fa-solid fa-palette"></i> Caption to Image
         </button>
-        <button class="action-btn" id="speakBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-          Speak
+        <button class="tab-btn" onclick="switchTab('image-to-caption')">
+          <i class="fa-solid fa-eye"></i> Image to Caption
+        </button>
+        <button class="tab-btn" onclick="switchTab('remix-studio')">
+          <i class="fa-solid fa-shuffle"></i> Mix & Remix Studio
+        </button>
+        <button class="tab-btn" onclick="switchTab('training-hub')">
+          <i class="fa-solid fa-brain"></i> Datasets & Training
         </button>
       </div>
     </div>
-    <div class="output-body">
-      <div id="captionOutput"></div>
-    </div>
-    <div class="output-footer">
-      <div class="output-meta">
-        <span class="meta-pill" id="stylePill">—</span>
-        <span class="meta-pill" id="wordsPill">0 words</span>
+
+    <!-- ============================================================= -->
+    <!-- TAB 1: CAPTION TO IMAGE -->
+    <!-- ============================================================= -->
+    <div id="tab-caption-to-image" class="tab-pane active">
+      <div class="studio-card">
+        <div class="card-grid">
+          <!-- Left Controls -->
+          <div>
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-pencil"></i> Enter Caption / Visual Prompt</label>
+              <textarea id="c2iPrompt" class="textarea-input" placeholder="e.g. A futuristic cyberpunk city in the rain with holographic signs and neon reflections..."></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-wand-magic"></i> Visual Art Style</label>
+              <div class="chips-group" id="c2iStyleChips">
+                <span class="chip selected" data-value="photorealistic" onclick="selectChip('c2iStyleChips', this)">Photorealistic 8K</span>
+                <span class="chip" data-value="cinematic" onclick="selectChip('c2iStyleChips', this)">Cinematic Film</span>
+                <span class="chip" data-value="anime" onclick="selectChip('c2iStyleChips', this)">Anime Visual</span>
+                <span class="chip" data-value="cyberpunk" onclick="selectChip('c2iStyleChips', this)">Cyberpunk Neon</span>
+                <span class="chip" data-value="fantasy" onclick="selectChip('c2iStyleChips', this)">Epic Fantasy</span>
+                <span class="chip" data-value="3d_render" onclick="selectChip('c2iStyleChips', this)">3D Pixar / Octane</span>
+                <span class="chip" data-value="watercolor" onclick="selectChip('c2iStyleChips', this)">Watercolor</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-crop"></i> Aspect Ratio</label>
+              <div class="chips-group" id="c2iRatioChips">
+                <span class="chip selected" data-value="1:1" onclick="selectChip('c2iRatioChips', this)">1:1 Square</span>
+                <span class="chip" data-value="16:9" onclick="selectChip('c2iRatioChips', this)">16:9 Cinema</span>
+                <span class="chip" data-value="9:16" onclick="selectChip('c2iRatioChips', this)">9:16 Portrait</span>
+                <span class="chip" data-value="4:3" onclick="selectChip('c2iRatioChips', this)">4:3 Classic</span>
+              </div>
+            </div>
+
+            <!-- Quick sample buttons -->
+            <div class="form-group">
+              <label class="form-label" style="font-size: 0.75rem; color: var(--text-muted);">Quick Prompt Ideas:</label>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                <button type="button" class="btn-secondary" style="font-size: 0.75rem;" onclick="setPrompt('An astronaut discovering an ancient mystical crystal cave on Mars')">Mars Crystal Cave</button>
+                <button type="button" class="btn-secondary" style="font-size: 0.75rem;" onclick="setPrompt('Fluffy golden retriever wearing sunglasses on a sunny tropical beach')">Beach Dog</button>
+                <button type="button" class="btn-secondary" style="font-size: 0.75rem;" onclick="setPrompt('Steampunk flying airship sailing through golden sunset clouds')">Steampunk Airship</button>
+              </div>
+            </div>
+
+            <button id="btnGenerateImage" class="btn-primary" onclick="generateImageFromCaption()">
+              <i class="fa-solid fa-sparkles"></i> <span>Generate Image from Caption</span>
+            </button>
+          </div>
+
+          <!-- Right Output -->
+          <div>
+            <div id="c2iOutputBox" class="output-box">
+              <div id="c2iPlaceholder">
+                <i class="fa-regular fa-image" style="font-size: 3rem; color: rgba(255,255,255,0.2); margin-bottom: 12px;"></i>
+                <h3 style="font-size: 1.1rem; color: #cbd5e1; margin-bottom: 6px;">Your AI Masterpiece Appears Here</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 280px;">Enter a descriptive caption and click generate to synthesize high-resolution imagery.</p>
+              </div>
+
+              <div id="c2iResult" style="display: none; width: 100%;">
+                <img id="c2iOutputImage" class="output-image" src="" alt="Generated AI Visual" />
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+                  <a id="c2iDownloadBtn" href="#" download class="btn-secondary">
+                    <i class="fa-solid fa-download"></i> Download PNG
+                  </a>
+                  <button class="btn-secondary" onclick="sendToImageToCaption()">
+                    <i class="fa-solid fa-arrow-right"></i> Send to Captioner
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div style="font-size:.72rem;color:var(--muted)">ViT + GPT-2 · nlpconnect</div>
     </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 2: IMAGE TO CAPTION -->
+    <!-- ============================================================= -->
+    <div id="tab-image-to-caption" class="tab-pane">
+      <div class="studio-card">
+        <div class="card-grid">
+          <!-- Left Upload & Style -->
+          <div>
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-upload"></i> Upload Image</label>
+              <div id="dropZone" class="upload-zone" onclick="document.getElementById('imageFileInput').click()">
+                <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                <p style="font-weight: 600; margin-bottom: 4px;">Click to browse or drag & drop image here</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted);">PNG, JPG, WEBP up to 32MB</p>
+                <input type="file" id="imageFileInput" accept="image/*" style="display: none;" onchange="handleImageSelected(event)" />
+                <img id="imageFilePreview" class="upload-preview" alt="Selected Preview" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label"><i class="fa-solid fa-sliders"></i> Caption Narrative Style</label>
+              <div class="chips-group" id="i2cStyleChips">
+                <span class="chip" data-value="short" onclick="selectChip('i2cStyleChips', this)">Short Alt-Text (8-12 words)</span>
+                <span class="chip selected" data-value="balanced" onclick="selectChip('i2cStyleChips', this)">Balanced Paragraph</span>
+                <span class="chip" data-value="detailed" onclick="selectChip('i2cStyleChips', this)">Cinematic Story</span>
+                <span class="chip" data-value="social" onclick="selectChip('i2cStyleChips', this)">Social Media + Tags</span>
+              </div>
+            </div>
+
+            <button id="btnGenerateCaption" class="btn-primary" onclick="generateCaptionFromImage()">
+              <i class="fa-solid fa-magnifying-glass"></i> <span>Analyze & Generate Caption</span>
+            </button>
+          </div>
+
+          <!-- Right Caption Display -->
+          <div>
+            <div id="i2cOutputBox" class="output-box">
+              <div id="i2cPlaceholder">
+                <i class="fa-regular fa-comment-dots" style="font-size: 3rem; color: rgba(255,255,255,0.2); margin-bottom: 12px;"></i>
+                <h3 style="font-size: 1.1rem; color: #cbd5e1; margin-bottom: 6px;">Generated Captions Appear Here</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 280px;">Upload an image to inspect details and formulate natural language descriptions.</p>
+              </div>
+
+              <div id="i2cResult" style="display: none; width: 100%;">
+                <div id="captionTextDisplay" class="caption-result-text"></div>
+                <div id="tagsContainer" style="margin-bottom: 16px;"></div>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end;">
+                  <button id="btnPlayTTS" class="btn-secondary" onclick="playCaptionAudio()">
+                    <i class="fa-solid fa-volume-high"></i> Listen (TTS)
+                  </button>
+                  <button class="btn-secondary" onclick="copyCaptionToClipboard()">
+                    <i class="fa-solid fa-copy"></i> Copy Text
+                  </button>
+                  <button class="btn-secondary" onclick="sendToRemix()">
+                    <i class="fa-solid fa-shuffle"></i> Send to Remix
+                  </button>
+                </div>
+                <audio id="ttsAudioPlayer" style="display: none;"></audio>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 3: MULTIMODAL MIX & REMIX STUDIO -->
+    <!-- ============================================================= -->
+    <div id="tab-remix-studio" class="tab-pane">
+      <div class="studio-card">
+        <p style="color: var(--text-muted); margin-bottom: 24px;">Upload an initial image, extract its core visual concept, and re-synthesize an entirely new variation based on your creative steering directives.</p>
+        
+        <div class="card-grid">
+          <!-- Step Controls -->
+          <div>
+            <div class="form-group">
+              <label class="form-label">1. Base Caption / Concept (Extracted or Typed)</label>
+              <textarea id="remixBaseCaption" class="textarea-input" placeholder="Base concept or caption of your initial image..."></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">2. Creative Steering Modification</label>
+              <input id="remixModification" class="text-input" type="text" placeholder="e.g. Set in ancient feudal Japan with cherry blossom rain and misty mountains" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">3. Target Art Style</label>
+              <div class="chips-group" id="remixStyleChips">
+                <span class="chip selected" data-value="photorealistic" onclick="selectChip('remixStyleChips', this)">Photorealistic</span>
+                <span class="chip" data-value="cinematic" onclick="selectChip('remixStyleChips', this)">Cinematic</span>
+                <span class="chip" data-value="anime" onclick="selectChip('remixStyleChips', this)">Anime</span>
+                <span class="chip" data-value="fantasy" onclick="selectChip('remixStyleChips', this)">Fantasy</span>
+                <span class="chip" data-value="3d_render" onclick="selectChip('remixStyleChips', this)">3D Pixar</span>
+              </div>
+            </div>
+
+            <button id="btnRunRemix" class="btn-primary" onclick="runMultimodalRemix()">
+              <i class="fa-solid fa-shuffle"></i> <span>Synthesize Multimodal Remix</span>
+            </button>
+          </div>
+
+          <!-- Remix Output Preview -->
+          <div>
+            <div id="remixOutputBox" class="output-box">
+              <div id="remixPlaceholder">
+                <i class="fa-solid fa-wand-magic" style="font-size: 3rem; color: rgba(255,255,255,0.2); margin-bottom: 12px;"></i>
+                <h3 style="font-size: 1.1rem; color: #cbd5e1; margin-bottom: 6px;">Remixed Visual</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); max-width: 280px;">Combine visual elements with creative prompts to yield novel artistic variations.</p>
+              </div>
+
+              <div id="remixResult" style="display: none; width: 100%;">
+                <img id="remixOutputImage" class="output-image" src="" alt="Remixed Visual" />
+                <p id="remixPromptUsed" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 12px;"></p>
+                <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                  <a id="remixDownloadBtn" href="#" download class="btn-secondary">
+                    <i class="fa-solid fa-download"></i> Download PNG
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- TAB 4: DATASETS & MODEL TRAINING -->
+    <!-- ============================================================= -->
+    <div id="tab-training-hub" class="tab-pane">
+      <div class="studio-card">
+        
+        <!-- Metrics Row -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px;">
+          <div class="stat-badge">
+            <div id="statTotalPairs" class="stat-val">6</div>
+            <div class="stat-label">Image-Caption Pairs</div>
+          </div>
+          <div class="stat-badge">
+            <div id="statStatus" class="stat-val" style="color: #34d399; font-size: 1.4rem; padding-top: 6px;">Ready</div>
+            <div class="stat-label">Dataset Readiness</div>
+          </div>
+          <div class="stat-badge">
+            <div id="statEpochs" class="stat-val">5</div>
+            <div class="stat-label">Training Epochs</div>
+          </div>
+          <div class="stat-badge">
+            <div id="statLoss" class="stat-val" style="color: #a78bfa;">0.000</div>
+            <div class="stat-label">Validation Loss</div>
+          </div>
+        </div>
+
+        <!-- Training Control Panel -->
+        <div style="background: rgba(15, 23, 42, 0.5); padding: 20px; border-radius: 16px; border: 1px solid var(--card-border); margin-bottom: 28px;">
+          <h3 style="font-size: 1.1rem; margin-bottom: 12px;"><i class="fa-solid fa-sliders"></i> Training Hyperparameters</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; align-items: flex-end;">
+            <div>
+              <label class="form-label">Model Target</label>
+              <select id="trainModelType" class="select-input">
+                <option value="captioning">VisionEncoderDecoder (ViT + GPT-2)</option>
+                <option value="diffusion">Text-to-Image Diffusion (LoRA)</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Epochs</label>
+              <input id="trainEpochs" type="number" class="text-input" value="5" min="1" max="50" />
+            </div>
+            <div>
+              <label class="form-label">Learning Rate</label>
+              <input id="trainLR" type="text" class="text-input" value="0.00005" />
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button id="btnStartTrain" class="btn-primary" style="padding: 12px;" onclick="startTraining()">
+                <i class="fa-solid fa-play"></i> Start Training
+              </button>
+              <button id="btnStopTrain" class="btn-secondary" style="padding: 12px;" onclick="stopTraining()">
+                <i class="fa-solid fa-stop"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Training Output Console -->
+          <div style="margin-top: 18px;">
+            <label class="form-label"><i class="fa-solid fa-terminal"></i> Live Training Telemetry</label>
+            <div id="trainConsole" class="console-box">
+              [System Ready] Ready to initiate fine-tuning on multimodal dataset...
+            </div>
+          </div>
+        </div>
+
+        <!-- Dataset Browser -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-database"></i> Training Dataset Samples</h3>
+          <button class="btn-secondary" onclick="syncDataset()">
+            <i class="fa-solid fa-arrows-rotate"></i> Sync / Download Dataset
+          </button>
+        </div>
+        <div id="datasetSamplesGrid" class="dataset-grid"></div>
+
+      </div>
+    </div>
+
   </div>
-</section>
 
-<!-- About / How it works -->
-<section id="about">
-  <div class="section-label">
-    <h2>How It Works</h2>
-    <p>Powered by state-of-the-art vision-language models</p>
-  </div>
-  <div class="about-grid">
-    <div class="about-card">
-      <div class="about-icon">🧠</div>
-      <div class="about-title">Vision Transformer (ViT)</div>
-      <div class="about-desc">Google's ViT-Base splits your image into 16×16 patches and encodes them as rich visual tokens that capture spatial relationships and fine details.</div>
-    </div>
-    <div class="about-card">
-      <div class="about-icon">✍️</div>
-      <div class="about-title">GPT-2 Decoder</div>
-      <div class="about-desc">OpenAI's GPT-2 language model decodes the visual tokens into fluent natural language using beam search for high-quality caption generation.</div>
-    </div>
-    <div class="about-card">
-      <div class="about-icon">🎨</div>
-      <div class="about-title">Style Enhancement</div>
-      <div class="about-desc">A post-processing layer transforms the base caption into Short, Balanced, or Detailed formats using keyword analysis and template expansion.</div>
-    </div>
-  </div>
-</section>
+  <!-- Scripts -->
+  <script>
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+      
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (activeBtn) activeBtn.classList.add('active');
 
-<footer>
-  Built with <span>Flask · HuggingFace Transformers · ViT + GPT-2</span> &nbsp;·&nbsp; Harsh Ramesh Nerkar
-</footer>
+      const targetPane = document.getElementById(`tab-${tabId}`);
+      if (targetPane) targetPane.classList.add('active');
 
-<div id="toast"></div>
-
-<script>
-  const uploadZone   = document.getElementById('uploadZone');
-  const imageInput   = document.getElementById('imageInput');
-  const previewWrap  = document.getElementById('previewWrap');
-  const previewImg   = document.getElementById('previewImg');
-  const changeBtn    = document.getElementById('changeBtn');
-  const styleSection = document.getElementById('styleSection');
-  const genWrap      = document.getElementById('genWrap');
-  const generateBtn  = document.getElementById('generateBtn');
-  const outputCard   = document.getElementById('outputCard');
-  const captionOutput= document.getElementById('captionOutput');
-  const loadingBar   = document.getElementById('loadingBar');
-  const loadingHint  = document.getElementById('loadingHint');
-  const toast        = document.getElementById('toast');
-
-  let currentFile   = null;
-  let selectedStyle = 'short';
-  let lastCaption   = '';
-
-  // ── Model status ────────────────────────────────────────────────────────────
-  async function checkModel() {
-    try {
-      const d = await (await fetch('/api/model_status')).json();
-      const el = document.getElementById('modelStatus');
-      const tx = document.getElementById('statusText');
-      if (d.loaded) {
-        el.classList.add('ready'); tx.textContent = 'Model Ready';
-      } else {
-        el.classList.add('error'); tx.textContent = 'Model Error';
+      if (tabId === 'training-hub') {
+        loadDatasetSamples();
       }
-    } catch { document.getElementById('statusText').textContent = 'Offline'; }
-  }
-  checkModel();
-
-  // ── Upload ──────────────────────────────────────────────────────────────────
-  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-  uploadZone.addEventListener('drop', e => {
-    e.preventDefault(); uploadZone.classList.remove('drag-over');
-    const f = e.dataTransfer.files[0];
-    if (f) loadFile(f);
-  });
-  imageInput.addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
-
-  function loadFile(file) {
-    if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return; }
-    currentFile = file;
-    const reader = new FileReader();
-    reader.onload = e => {
-      previewImg.src = e.target.result;
-      uploadZone.style.display = 'none';
-      previewWrap.style.display = 'block';
-      styleSection.style.display = 'block';
-      genWrap.style.display = 'block';
-      outputCard.classList.remove('show');
-    };
-    reader.readAsDataURL(file);
-  }
-
-  changeBtn.addEventListener('click', () => {
-    uploadZone.style.display = 'block';
-    previewWrap.style.display = 'none';
-    styleSection.style.display = 'none';
-    genWrap.style.display = 'none';
-    outputCard.classList.remove('show');
-    currentFile = null;
-    imageInput.value = '';
-  });
-
-  // ── Style selection ─────────────────────────────────────────────────────────
-  document.querySelectorAll('.style-card').forEach(card => {
-    card.addEventListener('click', () => {
-      document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
-      selectedStyle = card.dataset.style;
-    });
-  });
-
-  // ── Generate ────────────────────────────────────────────────────────────────
-  generateBtn.addEventListener('click', async () => {
-    if (!currentFile) { showToast('Please upload an image first', 'error'); return; }
-
-    generateBtn.disabled = true;
-    generateBtn.innerHTML = `<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Generating…`;
-    loadingBar.classList.add('show');
-    loadingHint.style.display = 'block';
-    outputCard.classList.remove('show');
-
-    const form = new FormData();
-    form.append('image', currentFile);
-    form.append('style', selectedStyle);
-
-    try {
-      const res  = await fetch('/api/generate_caption', { method: 'POST', body: form });
-      const data = await res.json();
-      if (data.success) {
-        renderCaption(data.caption, data.style);
-        showToast('Caption generated!', 'success');
-      } else {
-        throw new Error(data.error || 'Generation failed');
-      }
-    } catch (err) {
-      showToast(`Error: ${err.message}`, 'error');
-    } finally {
-      generateBtn.disabled = false;
-      generateBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Generate Caption`;
-      loadingBar.classList.remove('show');
-      loadingHint.style.display = 'none';
     }
-  });
 
-  function renderCaption(text, style) {
-    lastCaption = text;
-    const styleLabels = { short: '⚡ Short', balanced: '📖 Balanced', detailed: '📚 Detailed Story' };
-    const words = text.trim().split(/\s+/).length;
+    // Chip Selection Helper
+    function selectChip(groupId, element) {
+      document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('selected'));
+      element.classList.add('selected');
+    }
 
-    let cls = '';
-    if (style === 'short')    cls = 'caption-short';
-    if (style === 'balanced') cls = 'caption-balanced';
-    if (style === 'detailed') cls = 'caption-detailed';
+    function getSelectedChip(groupId) {
+      const selected = document.querySelector(`#${groupId} .chip.selected`);
+      return selected ? selected.getAttribute('data-value') : '';
+    }
 
-    captionOutput.innerHTML = `<div class="${cls}">${text}</div>`;
-    document.getElementById('stylePill').textContent  = styleLabels[style] || style;
-    document.getElementById('wordsPill').textContent  = `${words} words`;
-    outputCard.classList.add('show');
-    outputCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+    function setPrompt(text) {
+      document.getElementById('c2iPrompt').value = text;
+    }
 
-  // ── Actions ─────────────────────────────────────────────────────────────────
-  document.getElementById('copyBtn').addEventListener('click', () => {
-    navigator.clipboard.writeText(lastCaption).then(() => showToast('Copied to clipboard!', 'success'));
-  });
+    // --- 1. Caption to Image Generation ---
+    async function generateImageFromCaption() {
+      const prompt = document.getElementById('c2iPrompt').value.trim();
+      if (!prompt) {
+        alert("Please enter a prompt or caption first!");
+        return;
+      }
 
-  document.getElementById('speakBtn').addEventListener('click', () => {
-    if (!lastCaption) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(lastCaption);
-    speechSynthesis.speak(u);
-    showToast('Playing audio…');
-  });
+      const style = getSelectedChip('c2iStyleChips') || 'photorealistic';
+      const ratio = getSelectedChip('c2iRatioChips') || '1:1';
+      const btn = document.getElementById('btnGenerateImage');
+      const placeholder = document.getElementById('c2iPlaceholder');
+      const resultBox = document.getElementById('c2iResult');
+      const outputImg = document.getElementById('c2iOutputImage');
+      const downloadBtn = document.getElementById('c2iDownloadBtn');
 
-  // ── Toast ───────────────────────────────────────────────────────────────────
-  let toastTimer;
-  function showToast(msg, type = '') {
-    clearTimeout(toastTimer);
-    toast.textContent = msg;
-    toast.className = `show ${type}`;
-    toastTimer = setTimeout(() => toast.className = '', 3000);
-  }
-</script>
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> <span>Synthesizing Image...</span>`;
+      placeholder.style.display = 'block';
+      placeholder.innerHTML = `<span class="spinner" style="width: 36px; height: 36px; border-width: 4px; margin-bottom: 12px;"></span><h3 style="color: #cbd5e1;">Generating High-Resolution Visual...</h3><p style="color: var(--text-muted); font-size: 0.85rem;">Applying ${style} styling tokens...</p>`;
+      resultBox.style.display = 'none';
+
+      try {
+        const resp = await fetch('/api/generate_image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: prompt, style: style, aspect_ratio: ratio })
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+          outputImg.src = data.download_url + '?t=' + Date.now();
+          downloadBtn.href = data.download_url;
+          placeholder.style.display = 'none';
+          resultBox.style.display = 'block';
+          document.getElementById('c2iOutputBox').classList.add('has-content');
+        } else {
+          alert("Error: " + (data.error || "Failed to generate image"));
+          placeholder.style.display = 'block';
+        }
+      } catch (err) {
+        alert("Request error: " + err);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-sparkles"></i> <span>Generate Image from Caption</span>`;
+      }
+    }
+
+    function sendToImageToCaption() {
+      const img = document.getElementById('c2iOutputImage');
+      if (img && img.src) {
+        switchTab('image-to-caption');
+        document.getElementById('imageFilePreview').src = img.src;
+        document.getElementById('imageFilePreview').style.display = 'block';
+        window.activeImageBase64 = img.src;
+      }
+    }
+
+    // --- 2. Image to Caption Generation ---
+    let selectedImageFile = null;
+
+    function handleImageSelected(event) {
+      const file = event.target.files[0];
+      if (file) {
+        selectedImageFile = file;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const preview = document.getElementById('imageFilePreview');
+          preview.src = e.target.result;
+          preview.style.display = 'block';
+          window.activeImageBase64 = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // Drag and Drop
+    const dropZone = document.getElementById('dropZone');
+    ['dragenter', 'dragover'].forEach(name => {
+      dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(name => {
+      dropZone.addEventListener(name, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+    });
+    dropZone.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files.length) {
+        document.getElementById('imageFileInput').files = e.dataTransfer.files;
+        handleImageSelected({ target: { files: e.dataTransfer.files } });
+      }
+    });
+
+    async function generateCaptionFromImage() {
+      if (!selectedImageFile && !window.activeImageBase64) {
+        alert("Please upload or drag an image first!");
+        return;
+      }
+
+      const style = getSelectedChip('i2cStyleChips') || 'balanced';
+      const btn = document.getElementById('btnGenerateCaption');
+      const placeholder = document.getElementById('i2cPlaceholder');
+      const resultBox = document.getElementById('i2cResult');
+      const textDisplay = document.getElementById('captionTextDisplay');
+      const tagsContainer = document.getElementById('tagsContainer');
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> <span>Analyzing Image...</span>`;
+      placeholder.style.display = 'block';
+      placeholder.innerHTML = `<span class="spinner" style="width: 36px; height: 36px; border-width: 4px; margin-bottom: 12px;"></span><h3 style="color: #cbd5e1;">Inspecting Visual Patches...</h3>`;
+      resultBox.style.display = 'none';
+
+      try {
+        let resp;
+        if (selectedImageFile) {
+          const formData = new FormData();
+          formData.append('image', selectedImageFile);
+          formData.append('style', style);
+          resp = await fetch('/api/generate_caption', { method: 'POST', body: formData });
+        } else {
+          resp = await fetch('/api/generate_caption', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image_base64: window.activeImageBase64, style: style })
+          });
+        }
+
+        const data = await resp.json();
+        if (data.success) {
+          window.lastGeneratedCaption = data.caption;
+          textDisplay.textContent = data.caption;
+          
+          tagsContainer.innerHTML = '';
+          if (data.tags && data.tags.length) {
+            data.tags.forEach(t => {
+              const pill = document.createElement('span');
+              pill.className = 'tag-pill';
+              pill.textContent = '#' + t;
+              tagsContainer.appendChild(pill);
+            });
+          }
+
+          placeholder.style.display = 'none';
+          resultBox.style.display = 'block';
+          document.getElementById('i2cOutputBox').classList.add('has-content');
+        } else {
+          alert("Error: " + (data.error || "Caption generation failed."));
+        }
+      } catch (err) {
+        alert("Request error: " + err);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> <span>Analyze & Generate Caption</span>`;
+      }
+    }
+
+    async function playCaptionAudio() {
+      const text = window.lastGeneratedCaption;
+      if (!text) return;
+
+      const btn = document.getElementById('btnPlayTTS');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Playing...`;
+
+      try {
+        const resp = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          const player = document.getElementById('ttsAudioPlayer');
+          player.src = data.audio_url;
+          player.play();
+          player.onended = () => {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-volume-high"></i> Listen (TTS)`;
+          };
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-volume-high"></i> Listen (TTS)`;
+      }
+    }
+
+    function copyCaptionToClipboard() {
+      if (window.lastGeneratedCaption) {
+        navigator.clipboard.writeText(window.lastGeneratedCaption);
+        alert("Caption copied to clipboard!");
+      }
+    }
+
+    function sendToRemix() {
+      if (window.lastGeneratedCaption) {
+        switchTab('remix-studio');
+        document.getElementById('remixBaseCaption').value = window.lastGeneratedCaption;
+      }
+    }
+
+    // --- 3. Mix & Remix Studio ---
+    async function runMultimodalRemix() {
+      const baseCaption = document.getElementById('remixBaseCaption').value.trim();
+      const mod = document.getElementById('remixModification').value.trim();
+      const style = getSelectedChip('remixStyleChips') || 'photorealistic';
+
+      if (!baseCaption) {
+        alert("Please provide a base caption first!");
+        return;
+      }
+
+      const btn = document.getElementById('btnRunRemix');
+      const placeholder = document.getElementById('remixPlaceholder');
+      const resultBox = document.getElementById('remixResult');
+      const outputImg = document.getElementById('remixOutputImage');
+      const downloadBtn = document.getElementById('remixDownloadBtn');
+      const promptUsed = document.getElementById('remixPromptUsed');
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> <span>Synthesizing Remix...</span>`;
+      placeholder.style.display = 'block';
+      resultBox.style.display = 'none';
+
+      try {
+        const resp = await fetch('/api/remix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base_caption: baseCaption,
+            user_modification: mod,
+            target_style: style
+          })
+        });
+        const data = await resp.json();
+        if (data.success) {
+          outputImg.src = data.download_url + '?t=' + Date.now();
+          downloadBtn.href = data.download_url;
+          promptUsed.textContent = "Composed Prompt: " + data.final_composed_prompt;
+          placeholder.style.display = 'none';
+          resultBox.style.display = 'block';
+          document.getElementById('remixOutputBox').classList.add('has-content');
+        } else {
+          alert("Remix failed: " + (data.error || "Unknown error"));
+        }
+      } catch (err) {
+        alert("Error: " + err);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-shuffle"></i> <span>Synthesize Multimodal Remix</span>`;
+      }
+    }
+
+    // --- 4. Datasets & Training Hub ---
+    let trainingPollInterval = null;
+
+    async function loadDatasetSamples() {
+      try {
+        const resp = await fetch('/api/dataset/samples');
+        const data = await resp.json();
+        if (data.success) {
+          document.getElementById('statTotalPairs').textContent = data.stats.total_pairs;
+          const grid = document.getElementById('datasetSamplesGrid');
+          grid.innerHTML = '';
+
+          data.samples.forEach(s => {
+            const card = document.createElement('div');
+            card.className = 'dataset-item';
+            card.innerHTML = `
+              <img class="dataset-img" src="${s.relative_path}" alt="Dataset sample" onerror="this.src='https://placehold.co/400x300/1e293b/white?text=Dataset+Sample'" />
+              <div class="dataset-info">
+                <span class="tag-pill">${s.category || 'Curated'}</span>
+                <p class="dataset-caption">${s.caption}</p>
+              </div>
+            `;
+            grid.appendChild(card);
+          });
+        }
+      } catch (e) {
+        console.error("Failed to load dataset samples:", e);
+      }
+    }
+
+    async function syncDataset() {
+      try {
+        const resp = await fetch('/api/dataset/download', { method: 'POST' });
+        const data = await resp.json();
+        alert(`Dataset synced! Total samples: ${data.total_samples}`);
+        loadDatasetSamples();
+      } catch (e) {
+        alert("Failed to sync dataset: " + e);
+      }
+    }
+
+    async function startTraining() {
+      const modelType = document.getElementById('trainModelType').value;
+      const epochs = document.getElementById('trainEpochs').value;
+      const lr = document.getElementById('trainLR').value;
+
+      document.getElementById('btnStartTrain').disabled = true;
+      document.getElementById('statEpochs').textContent = epochs;
+
+      try {
+        const resp = await fetch('/api/train/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model_type: modelType, epochs: epochs, learning_rate: lr })
+        });
+        const data = await resp.json();
+
+        if (data.status === 'started') {
+          pollTrainingStatus();
+        } else {
+          alert(data.message || "Could not start training.");
+          document.getElementById('btnStartTrain').disabled = false;
+        }
+      } catch (e) {
+        alert("Training error: " + e);
+        document.getElementById('btnStartTrain').disabled = false;
+      }
+    }
+
+    function pollTrainingStatus() {
+      if (trainingPollInterval) clearInterval(trainingPollInterval);
+      const consoleBox = document.getElementById('trainConsole');
+
+      trainingPollInterval = setInterval(async () => {
+        try {
+          const resp = await fetch('/api/train/status');
+          const job = await resp.json();
+
+          document.getElementById('statLoss').textContent = job.loss ? job.loss.toFixed(4) : "0.000";
+          document.getElementById('statStatus').textContent = job.status.toUpperCase();
+
+          const logLine = document.createElement('div');
+          logLine.textContent = `[${new Date().toLocaleTimeString()}] ${job.message}`;
+          consoleBox.appendChild(logLine);
+          consoleBox.scrollTop = consoleBox.scrollHeight;
+
+          if (job.status === 'completed' || job.status === 'stopped') {
+            clearInterval(trainingPollInterval);
+            document.getElementById('btnStartTrain').disabled = false;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }, 1200);
+    }
+
+    async function stopTraining() {
+      await fetch('/api/train/stop', { method: 'POST' });
+    }
+
+    // Auto load dataset samples on initial load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadDatasetSamples();
+    });
+  </script>
+
 </body>
 </html>

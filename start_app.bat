@@ -1,15 +1,15 @@
 @echo off
+echo ===================================================
+echo   CaptionAI — Bidirectional Multimodal Vision Studio
+echo ===================================================
 echo.
-echo ========================================
-echo   AI Image Caption Generator
-echo ========================================
-echo.
-echo Web Interface: http://localhost:5000
-echo.
-echo Press Ctrl+C to stop the server
-echo ========================================
+echo Starting server at http://127.0.0.1:5000
 echo.
 
-python app.py
+if exist "venv\Scripts\python.exe" (
+    venv\Scripts\python.exe app.py
+) else (
+    python app.py
+)
 
 pause
